@@ -1,23 +1,26 @@
-# ADR-015: Cloudflare Edge with AWS Singapore Runtime
+# ADR-015: Vercel Web Apps with Managed Persistent Backend
 
 ## Status
 
-PROPOSED
+**ACCEPTED** — Founder-approved for WYN V1.0.0.
 
 ## Context
 
-Thailand-first WYN needs low latency, separate web/admin/API/worker scaling, managed PostgreSQL, media CDN, operational maturity and a non-excessive V1 burden.
+WYN needs separately deployed Consumer and Admin web apps, persistent API/WebSocket behavior, independently running workers, managed PostgreSQL, CDN-backed media, and low operational burden at roughly 1,000 DAU. The stack must retain a practical path to 10k–100k DAU without premature infrastructure.
 
 ## Decision
 
-Propose Cloudflare DNS/CDN/WAF/R2 and AWS `ap-southeast-1` managed compute plus RDS PostgreSQL, with Upstash Redis, Postmark and Sentry as managed adjuncts. Deploy OCI-compatible artifacts through GitHub Actions protected environments. Final AWS compute product follows a small approved operational evaluation; no infrastructure is authorized here.
+Deploy Consumer Web and Admin Web as separate **Vercel** projects with isolated origins, configuration, artifacts, and session boundaries. Run the API and worker on managed container/runtime providers suitable for persistent Node.js processes; do not force these workloads into short-lived serverless functions. Use managed PostgreSQL, Cloudflare R2/CDN for media, and managed Redis-compatible infrastructure only when justified.
+
+Use GitHub Actions for required quality/security gates and immutable release artifacts. Exact backend/database providers and regions require an operational evaluation and budget approval. Every production deployment requires explicit Founder approval.
 
 ## Alternatives
 
-- Vercel plus another backend: excellent Next experience but fragments runtime and can increase function/bandwidth coupling.
-- Railway/Render: simple, but production region, controls, WebSocket/worker and support posture must be validated.
-- All AWS: fewer primary vendors, but less attractive media egress/CDN economics and more setup.
+- All workloads on web-platform functions: simpler vendor surface but unsuitable where persistent WebSockets or workers require long-lived processes and controlled draining.
+- All AWS: broad capability but higher V1 operational burden than the preferred managed split.
+- Kubernetes: powerful orchestration but unjustified at V1 scale.
+- One web deployment: conflicts with the required Consumer/Admin deployment and security boundary.
 
 ## Consequences
 
-Singapore is a practical regional base and managed services reduce toil. Multi-vendor incidents, transfer paths and billing need monitoring. Standard PostgreSQL/S3/OCI/OTel interfaces reduce—not eliminate—lock-in. Founder must approve providers, budget, region, production and every change-controlled deployment.
+The web apps gain optimized managed Next.js hosting while API and worker can scale according to their actual persistent workload. Multi-provider operations, transfer costs, observability, secret isolation, and incident ownership need explicit runbooks. Standard Node, PostgreSQL, S3-compatible storage, OCI where supported, and OpenTelemetry-compatible interfaces reduce migration friction.

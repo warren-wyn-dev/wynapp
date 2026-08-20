@@ -1,6 +1,6 @@
 # Testing and Security Verification Stack
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 Use **Vitest** for TypeScript unit/component tests and API application tests, a disposable real PostgreSQL database for repository/transaction/outbox integration tests, and **Playwright** for independent Consumer and Admin browser suites. Mock only external providers at stable adapters; do not use SQLite as a PostgreSQL substitute. Run migration-up/down safety checks only when migrations are later authorized.
 

@@ -1,6 +1,6 @@
 # Monorepo and Tooling
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 ## Decision
 

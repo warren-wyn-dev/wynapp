@@ -1,6 +1,6 @@
 # Observability Stack
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 Use **Pino** JSON logs to stdout, provider log retention/search, **Sentry** for redacted frontend/backend errors and performance sampling, and **OpenTelemetry-compatible interfaces** for traces/metrics that become useful. Start with platform/database metrics plus a small set of product-integrity operational metrics rather than running a full observability cluster.
 
