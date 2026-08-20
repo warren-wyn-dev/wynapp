@@ -52,13 +52,13 @@
 5. หลัง server ยืนยันผล client ล้าง credential และข้อมูล private ที่ cache ไว้บนอุปกรณ์ แล้วพาผู้ใช้ไปยัง signed-out surface
 6. protected request และการพยายามต่ออายุ session ด้วย credential เดิมหลัง Logout ต้องถูก server ปฏิเสธ
 
-**Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แต่ต้องไม่แสดงว่า Logout สำเร็จ; แสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry โดยไม่เปิดเผย credential/session detail และ retry ต้องไม่ทำให้เกิด session ใหม่
+**Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องนำ credential ออกจาก authenticated state ทันทีและต้องไม่แสดงว่า Logout สำเร็จ; แสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry โดยไม่เปิดเผย credential/session detail หาก retry จำเป็นต้องใช้ credential เดิม client ต้องแยกเก็บ credential นั้นอย่างปลอดภัยสำหรับคำขอ invalidate เดิมเท่านั้น ห้ามใช้เรียก protected action หรือต่ออายุ session และต้องลบทิ้งเมื่อ server ยืนยันผลสำเร็จ; retry ต้องไม่ทำให้เกิด session หรือ credential ใหม่
 
 **P0 verification scenarios:**
 
 - **Successful invalidation:** หลังได้รับผลสำเร็จ การเรียก protected action และการต่ออายุ session ด้วย credential เดิมต้องถูกปฏิเสธ
 - **Idempotent replay:** การส่ง Logout ซ้ำด้วย credential เดิม รวมถึงกรณี session หมดอายุหรือถูก invalidate ไปแล้ว ต้องยังได้สถานะ logged-out โดยไม่สร้าง session/credential ใหม่และไม่เปิดเผยว่า session เคยมีอยู่หรือไม่
-- **Unconfirmed invalidation:** เมื่อจำลอง network timeout หรือ server failure ก่อนยืนยันผล UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย
+- **Unconfirmed invalidation:** เมื่อจำลอง network timeout หรือ server failure ก่อนยืนยันผล UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย; credential ที่แยกเก็บเพื่อ retry ต้องใช้ไม่ได้กับ protected action/การต่ออายุ session และถูกลบหลัง server ยืนยันผล
 - **Client-only clearing is insufficient:** เมื่อจำลอง client ที่ล้าง local state โดยไม่มีผลยืนยันจาก server credential เดิมต้องไม่ถูกนับว่า invalidate แล้ว และ test ต้องไม่รายงาน Logout ว่าสำเร็จ
 
 ## UF-04 Create Drop

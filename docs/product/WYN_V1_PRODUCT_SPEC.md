@@ -69,7 +69,7 @@ WYN V1.0.0 คือแพลตฟอร์มโซเชียลแบบ mo
 - Logout เป็น P0 และต้อง implement/ทดสอบตาม canonical flow [`UF-03 Logout`](./USER_FLOWS.md#uf-03-logout); การล้าง state หรือ credential เฉพาะที่ client ไม่ถือเป็น Logout สำเร็จ
 - เมื่อ Logout สำเร็จ server ต้อง invalidate active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นก่อนแสดงผลสำเร็จ; credential ดังกล่าวต้องไม่สามารถใช้เข้าถึง protected action หรือสร้าง session ใหม่ได้อีก
 - Logout ต้องเป็น idempotent: การส่งคำขอซ้ำหรือ logout session ที่ invalid/หมดอายุแล้วต้องได้ผลลัพธ์เป็น logged-out โดยไม่สร้าง session ใหม่หรือเปิดเผยรายละเอียดของ session
-- หาก server ยืนยันการ invalidate ไม่สำเร็จ ระบบต้องไม่แสดงว่า Logout สำเร็จ ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แสดงสถานะที่ปลอดภัยว่าอาจยังมี active session และให้ผู้ใช้ retry ได้; ห้าม fallback เป็นการล้าง client state เพียงอย่างเดียวแล้วถือว่า logout สำเร็จ
+- หาก server ยืนยันการ invalidate ไม่สำเร็จ ระบบต้องไม่แสดงว่า Logout สำเร็จ ต้องนำ credential ออกจาก authenticated state ทันที แสดงสถานะที่ปลอดภัยว่าอาจยังมี active session และให้ผู้ใช้ retry ได้; หากจำเป็นต้องเก็บ credential เพื่อ retry ต้องแยกเก็บอย่างปลอดภัย ใช้ได้เฉพาะส่งคำขอ invalidate เดิม และต้องลบทิ้งเมื่อ server ยืนยันผล ห้ามใช้ credential ดังกล่าวเรียก protected action, ต่ออายุ session หรือ fallback เป็นการล้าง client state เพียงอย่างเดียวแล้วถือว่า logout สำเร็จ
 - ต้องมีสถานะ validation, duplicate account/username, invalid credential, locked/restricted account และ recoverable system error
 
 ### 4.2 Home
