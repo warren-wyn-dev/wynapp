@@ -39,6 +39,8 @@
 
 ## UF-03 Logout
 
+> **Founder Decision dependency (FD-15):** revocation handle และ `pending-logout` lifecycle ด้านล่างเป็น flow proposal เพื่อประกอบการตัดสินใจเท่านั้น ยังไม่ใช่ flow ที่อนุมัติ และห้ามนำไปออกแบบหรือ implement จนกว่า Founder จะอนุมัติ authentication-architecture/security-policy change นี้ หากไม่อนุมัติให้ใช้ Logout/retry เดิมโดยไม่เพิ่ม bearer capability
+
 **Precondition:** ผู้ใช้มีหรือเคยมี active session บนอุปกรณ์ และเมื่อ server สร้าง session ได้ออก revocation handle แบบสุ่มที่ผูกกับ session โดยเก็บแยกจาก authentication credential
 
 **Success:** active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นถูก invalidate ที่ server และไม่สามารถใช้กับ protected action หรือสร้าง session ใหม่ได้
