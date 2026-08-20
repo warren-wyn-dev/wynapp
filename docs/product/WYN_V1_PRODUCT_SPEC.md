@@ -66,6 +66,7 @@ WYN V1.0.0 คือแพลตฟอร์มโซเชียลแบบ mo
 - username ต้องไม่ซ้ำ; รูปแบบ username, credential method, account recovery และ verification เป็น Founder Decision
 - บัญชีใหม่เป็น Public โดยค่าเริ่มต้น และเจ้าของบัญชีเปลี่ยนเป็น Private ได้
 - protected action ต้องยืนยันตัวตนและตรวจ authorization ที่ server; error ต้องไม่เปิดเผย credential หรือข้อมูล private
+- Logout เป็น P0 และต้อง implement/ทดสอบตาม canonical flow [`UF-03 Logout`](./USER_FLOWS.md#uf-03-logout); การล้าง state หรือ credential เฉพาะที่ client ไม่ถือเป็น Logout สำเร็จ
 - เมื่อ Logout สำเร็จ server ต้อง invalidate active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นก่อนแสดงผลสำเร็จ; credential ดังกล่าวต้องไม่สามารถใช้เข้าถึง protected action หรือสร้าง session ใหม่ได้อีก
 - Logout ต้องเป็น idempotent: การส่งคำขอซ้ำหรือ logout session ที่ invalid/หมดอายุแล้วต้องได้ผลลัพธ์เป็น logged-out โดยไม่สร้าง session ใหม่หรือเปิดเผยรายละเอียดของ session
 - หาก server ยืนยันการ invalidate ไม่สำเร็จ ระบบต้องไม่แสดงว่า Logout สำเร็จ ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แสดงสถานะที่ปลอดภัยว่าอาจยังมี active session และให้ผู้ใช้ retry ได้; ห้าม fallback เป็นการล้าง client state เพียงอย่างเดียวแล้วถือว่า logout สำเร็จ
