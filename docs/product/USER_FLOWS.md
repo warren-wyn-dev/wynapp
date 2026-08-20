@@ -57,6 +57,7 @@
 - **Successful invalidation:** หลังได้รับผลสำเร็จ การเรียก protected action และการต่ออายุ session ด้วย credential เดิมต้องถูกปฏิเสธ
 - **Idempotent replay:** การส่ง Logout ซ้ำด้วย credential เดิม รวมถึงกรณี session หมดอายุหรือถูก invalidate ไปแล้ว ต้องยังได้สถานะ logged-out โดยไม่สร้าง session/credential ใหม่และไม่เปิดเผยว่า session เคยมีอยู่หรือไม่
 - **Unconfirmed invalidation:** เมื่อจำลองให้คำขอ Logout แรก timeout ก่อนถึง server UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย จากนั้นผู้ทดสอบต้องกด Retry, รอผลยืนยัน logged-out จาก server และตรวจว่า protected request รวมถึงการต่ออายุ session ด้วย credential เดิมจากก่อน Logout ถูก server ปฏิเสธ
+- **Server failure:** เมื่อ server ตอบข้อผิดพลาด 5xx ต่อคำขอ Logout UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนว่า session อาจยัง active พร้อม Retry ที่ปลอดภัย จากนั้นเมื่อ Retry สำเร็จต้องรอผลยืนยัน logged-out จาก server และตรวจว่า protected request รวมถึงการต่ออายุ session ด้วย credential เดิมจากก่อน Logout ถูก server ปฏิเสธ
 
 ## UF-04 Create Drop
 
