@@ -39,18 +39,18 @@
 
 ## UF-03 Logout
 
-**Precondition:** ผู้ใช้มีหรือเคยมี active session บนอุปกรณ์
+**Precondition:** ผู้ใช้มีหรือเคยมี active session บนอุปกรณ์ และเมื่อ server สร้าง session ได้ออก revocation handle แบบสุ่มที่ผูกกับ session โดยเก็บแยกจาก authentication credential
 
 **Success:** active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นถูก invalidate ที่ server และไม่สามารถใช้กับ protected action หรือสร้าง session ใหม่ได้
 
 1. ผู้ใช้เลือก “ออกจากระบบ”
-2. client ส่งคำขอ Logout พร้อม session credential ไปยัง server และเข้าสู่ loading state โดยป้องกันการ submit ซ้ำที่ไม่จำเป็น
+2. client ส่งคำขอ Logout พร้อม session credential และ revocation handle ไปยัง server และเข้าสู่ loading state โดยป้องกันการ submit ซ้ำที่ไม่จำเป็น; handle ใช้ได้ครั้งเดียวและอนุญาตเฉพาะการ invalidate session ที่ผูกไว้ ไม่สามารถใช้ authenticate, เข้าถึง protected action, ต่ออายุ session หรือสร้าง session ใหม่
 3. server invalidate active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้น
 4. server ตอบผลแบบ idempotent: คำขอซ้ำ หรือ session ที่ invalid/หมดอายุแล้ว ให้ผลเป็น logged-out โดยไม่สร้าง session ใหม่และไม่เปิดเผยรายละเอียดของ session
-5. หลัง server ยืนยันผล client ล้าง credential และข้อมูล private ที่ cache ไว้บนอุปกรณ์ แล้วพาผู้ใช้ไปยัง signed-out surface
+5. หลัง server ยืนยันผล client ล้าง credential, revocation handle และข้อมูล private ที่ cache ไว้บนอุปกรณ์ แล้วพาผู้ใช้ไปยัง signed-out surface; server ทำให้ handle ใช้ซ้ำไม่ได้
 6. protected request และการพยายามต่ออายุ session ด้วย credential เดิมหลัง Logout ต้องถูก server ปฏิเสธ
 
-**Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แต่ต้องไม่แสดงว่า Logout สำเร็จ; แสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry โดยไม่เปิดเผย credential/session detail และ retry ต้องไม่ทำให้เกิด session ใหม่
+**Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องล้าง authentication credential และข้อมูล private ออกจากอุปกรณ์เท่าที่ทำได้ แต่เก็บ revocation handle แยกไว้เฉพาะใน pending-logout state; ต้องไม่แสดงว่า Logout สำเร็จ และต้องแสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry ซึ่งใช้ handle เพื่อ invalidate session เดิมได้แม้คำขอแรกไม่ถึง server โดยไม่ authenticate ผู้ใช้ ไม่เปิดเผย credential/session detail และไม่สร้าง session ใหม่ เมื่อ server ยืนยันการ invalidate หรือ handle หมดอายุ client ต้องลบ handle
 
 ## UF-04 Create Drop
 
