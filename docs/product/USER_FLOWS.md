@@ -37,7 +37,28 @@
 
 **Exceptions:** invalid credential, verification/recovery required, restricted/suspended/banned account, rate limit และ system error
 
-## UF-03 Create Drop
+## UF-03 Logout
+
+**Precondition:** ผู้ใช้มีหรือเคยมี active session บนอุปกรณ์
+
+**Success:** active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นถูก invalidate ที่ server และไม่สามารถใช้กับ protected action หรือสร้าง session ใหม่ได้
+
+1. ผู้ใช้เลือก “ออกจากระบบ”
+2. client ส่งคำขอ Logout พร้อม session credential ไปยัง server และเข้าสู่ loading state โดยป้องกันการ submit ซ้ำที่ไม่จำเป็น
+3. server invalidate active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้น
+4. server ตอบผลแบบ idempotent: คำขอซ้ำ หรือ session ที่ invalid/หมดอายุแล้ว ให้ผลเป็น logged-out โดยไม่สร้าง session ใหม่และไม่เปิดเผยรายละเอียดของ session
+5. หลัง server ยืนยันผล client ล้าง credential และข้อมูล private ที่ cache ไว้บนอุปกรณ์ แล้วพาผู้ใช้ไปยัง signed-out surface
+6. protected request และการพยายามต่ออายุ session ด้วย credential เดิมหลัง Logout ต้องถูก server ปฏิเสธ
+
+**Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แต่ต้องไม่แสดงว่า Logout สำเร็จ; แสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry โดยไม่เปิดเผย credential/session detail และ retry ต้องไม่ทำให้เกิด session ใหม่
+
+**P0 verification scenarios:**
+
+- **Successful invalidation:** หลังได้รับผลสำเร็จ การเรียก protected action และการต่ออายุ session ด้วย credential เดิมต้องถูกปฏิเสธ
+- **Idempotent replay:** การส่ง Logout ซ้ำด้วย credential เดิม รวมถึงกรณี session หมดอายุหรือถูก invalidate ไปแล้ว ต้องยังได้สถานะ logged-out โดยไม่สร้าง session/credential ใหม่และไม่เปิดเผยว่า session เคยมีอยู่หรือไม่
+- **Unconfirmed invalidation:** เมื่อจำลอง network timeout หรือ server failure ก่อนยืนยันผล UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย
+
+## UF-04 Create Drop
 
 1. ผู้ใช้เปิด composer
 2. เพิ่มข้อความ/caption และเลือก hashtag, mention, external link, poll, location หรือรูป 0–9 รูป
@@ -51,7 +72,7 @@
 
 **Edit/Delete branch:** เจ้าของเปิดเมนู → Edit ได้ภายใน 30 นาที → save แล้วแสดง Edited; หรือ Delete → confirm → safe soft-delete และหายจาก normal surfaces
 
-## UF-04 View Feed
+## UF-05 View Feed
 
 1. ผู้ใช้เข้า Home และเห็น For You เป็น tab ที่กำหนดตาม approved UX
 2. server ส่งเฉพาะ Drop ที่ผู้ใช้มีสิทธิ์ โดยกรอง block, mute, privacy และ moderation
@@ -61,17 +82,17 @@
 
 **States:** skeleton/loading, empty Following พร้อมคำแนะนำที่ปลอดภัย, retry error, end of feed, content unavailable ระหว่างเปิด; Club content ต้องคง visibility และไม่ป้อน Global Trending โดยตรง
 
-## UF-05 Follow / Unfollow
+## UF-06 Follow / Unfollow
 
 1. ผู้ใช้เปิด profile ที่ไม่ block กัน
 2. ถ้าเป็น Public เลือก Follow → server สร้าง relation → ปุ่มเป็น Following
-3. ถ้าเป็น Private ให้ไป UF-13
+3. ถ้าเป็น Private ให้ไป UF-14
 4. ผู้ใช้เลือก Unfollow และยืนยันเมื่อ UX กำหนด
 5. server ยกเลิก relation และ revoke private access ที่อาศัย relation นั้น
 
 **Exceptions:** self-follow, duplicate action, blocked user, target unavailable และ race เมื่อ privacy เปลี่ยน
 
-## UF-06 Comment และ Threaded Reply
+## UF-07 Comment และ Threaded Reply
 
 1. ผู้ใช้เปิด Drop ที่มีสิทธิ์และเปิด comments
 2. กรอก Comment หรือเลือก Reply ใต้ comment
@@ -79,7 +100,7 @@
 4. ระบบสร้าง comment/reply ใน thread และแจ้งผู้เกี่ยวข้องตาม settings
 5. หากต้นทางถูกลบ/ปิดสิทธิ์ก่อน submit ระบบไม่สร้าง comment และแจ้งเหตุอย่างปลอดภัย
 
-## UF-07 ReDrop / Quote ReDrop
+## UF-08 ReDrop / Quote ReDrop
 
 1. ผู้ใช้เลือก ReDrop บน Drop ที่มีสิทธิ์
 2. เลือก ReDrop ทันที หรือ Quote ReDrop
@@ -89,7 +110,7 @@
 
 **Exceptions:** ต้นฉบับ private/removed ระหว่าง flow, ผู้สร้าง block ผู้ใช้, duplicate ReDrop; reference ต้องไม่เปิดเผยเนื้อหาแก่ผู้ไม่มีสิทธิ์
 
-## UF-08 Join Club
+## UF-09 Join Club
 
 1. ผู้ใช้เปิด Club Profile
 2. server แสดงข้อมูลตาม Public/Private visibility
@@ -100,7 +121,7 @@
 
 **Exceptions:** blocked/banned member, duplicate request, Club restricted/removed, role ไม่มีสิทธิ์อนุมัติ
 
-## UF-09 Create Club Drop
+## UF-10 Create Club Drop
 
 **Precondition:** ผู้ใช้เป็นสมาชิกและ role/policy อนุญาตให้ post
 
@@ -111,7 +132,7 @@
 5. engagement ถูกบันทึกใน Club context และ **ไม่ส่งเข้า Global Trending โดยตรง**
 6. role ที่ได้รับสิทธิ์ pin หรือ moderate ได้ โดย action สำคัญถูก audit
 
-## UF-10 Send Message
+## UF-11 Send Message
 
 1. ผู้ใช้เปิด profile หรือ existing 1:1 conversation
 2. server ตรวจ block และ message policy
@@ -123,7 +144,7 @@
 
 **Exceptions:** blocked mid-flow, image invalid, entity ไม่มีสิทธิ์/ถูกลบ, delivery failure และ duplicate retry
 
-## UF-11 Report Content
+## UF-12 Report Content
 
 ใช้กับ User, Drop, Comment, Club และ Message
 
@@ -137,7 +158,7 @@
 
 **Exceptions:** entity ถูกลบแล้วแต่มี evidence, duplicate report, reporter ถูก block (ยังต้อง report ได้เมื่อมี context ที่เข้าถึงโดยชอบ), upload/context failure
 
-## UF-12 Create Club
+## UF-13 Create Club
 
 1. ผู้ใช้ที่ eligible เลือก Create Club
 2. กรอก Club name, profile, Public/Private, description และ Rules
@@ -147,7 +168,7 @@
 
 **Founder Decision dependency:** eligibility ในการสร้าง Club, uniqueness rule, creation limit และ moderation pre-check
 
-## UF-13 Private Account Follow Request
+## UF-14 Private Account Follow Request
 
 1. เจ้าของบัญชีเปิด Privacy Settings และเปลี่ยน Public → Private
 2. server บันทึก privacy; follower เดิมได้รับผลตาม policy ที่ Founder อนุมัติ
@@ -159,7 +180,7 @@
 
 **Exceptions:** duplicate request, block ระหว่าง pending, target กลับเป็น Public, account unavailable; server ต้อง resolve race โดยไม่ให้สิทธิ์เกินควร
 
-## UF-14 Block / Mute
+## UF-15 Block / Mute
 
 1. ผู้ใช้เลือก Block หรือ Mute จาก profile/content/chat
 2. ระบบอธิบายผลกระทบและขอ confirmation สำหรับ Block
@@ -167,7 +188,7 @@
 4. Mute ซ่อน content/notification โดยไม่แจ้งเป้าหมาย
 5. ผู้ใช้จัดการรายการ blocked/muted จาก Privacy Settings ได้
 
-## UF-15 Admin Moderation และ Appeal
+## UF-16 Admin Moderation และ Appeal
 
 1. Admin user เข้าสู่ WYN Admin application แยก
 2. server ตรวจ admin session และ role/action permission
@@ -183,12 +204,12 @@
 
 | Flow | Primary areas |
 |---|---|
-| UF-01–02 | Authentication & Account |
-| UF-03 | Drop |
-| UF-04 | Home, Discovery |
-| UF-05, UF-13 | Social Graph, Privacy |
-| UF-06–07 | Engagement |
-| UF-08–09, UF-12 | Club |
-| UF-10 | Basic Chat |
-| UF-11, UF-15 | Safety, Moderation, WYN Admin |
-| UF-14 | Safety & Privacy |
+| UF-01–03 | Authentication & Account |
+| UF-04 | Drop |
+| UF-05 | Home, Discovery |
+| UF-06, UF-14 | Social Graph, Privacy |
+| UF-07–08 | Engagement |
+| UF-09–10, UF-13 | Club |
+| UF-11 | Basic Chat |
+| UF-12, UF-16 | Safety, Moderation, WYN Admin |
+| UF-15 | Safety & Privacy |
