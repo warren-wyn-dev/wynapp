@@ -10,7 +10,7 @@ Notifications, media, search and ranking must follow committed state without dua
 
 ## Decision
 
-Write versioned event envelopes to PostgreSQL `outbox_events` in the same transaction as domain changes. Workers lease committed rows, deliver at least once, and use consumer receipts/business uniqueness for idempotency, bounded retry and dead-letter handling.
+Write versioned event envelopes to PostgreSQL `outbox_events` in the same transaction as domain changes. A dispatcher atomically creates one delivery row for every registered consumer before marking an event dispatched. Each consumer leases only its delivery rows, delivers at least once, and uses consumer receipts/business uniqueness for idempotency, bounded retry and per-consumer dead-letter handling.
 
 ## Alternatives
 
