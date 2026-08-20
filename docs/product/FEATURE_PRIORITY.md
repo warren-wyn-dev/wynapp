@@ -18,7 +18,7 @@ Priority นี้จัดระดับ capability ไม่ได้อน�
 
 | Area | Feature / minimum launch slice | เหตุผล |
 |---|---|---|
-| Authentication | Register, Login, Logout, age gate 18+, account status handling | ต้องมี identity และป้องกันผู้ใช้อายุต่ำกว่าเกณฑ์ |
+| Authentication | Register, Login, Logout ตาม UF-03, age gate 18+, account status handling | ต้องมี identity, server-side session invalidation ที่ทดสอบได้ และป้องกันผู้ใช้อายุต่ำกว่าเกณฑ์ |
 | Account privacy | Public default, switch Public/Private, Privacy Settings | เป็นกติกาหลักของ V1 |
 | Home | For You และ Following พร้อม loading/empty/error | เป็นเส้นทางค้นพบและบริโภค content หลัก |
 | Drop | Text, caption, hashtag, mention, external link | core publishing |
