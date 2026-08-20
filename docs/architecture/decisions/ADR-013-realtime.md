@@ -2,7 +2,7 @@
 
 ## Status
 
-PROPOSED
+**ACCEPTED** — Founder-approved for WYN V1.0.0.
 
 ## Context
 

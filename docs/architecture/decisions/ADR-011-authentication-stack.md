@@ -1,23 +1,25 @@
-# ADR-011: Self-hosted Better Auth with Server Sessions
+# ADR-011: Application-Owned Authentication with Server Sessions
 
 ## Status
 
-PROPOSED
+**ACCEPTED** — Founder-approved for WYN V1.0.0.
 
 ## Context
 
-V1 requires a complete email/password lifecycle, secure revocable sessions/logout-all and future OAuth, with strictly separate Consumer and Admin realms. Authentication is security-critical and relevant policy remains Founder-controlled.
+V1 requires email/password registration, verification, recovery, revocable sessions, logout-all, and strict separation between Consumer and Admin realms. Authentication is security-critical, while future Google/Apple identities must remain possible without handing product authorization to a vendor.
 
 ## Decision
 
-Subject to security review and Founder approval, use maintained Better Auth behind WYN-owned adapters and PostgreSQL-backed, opaque cookie sessions. Consumer and Admin use distinct cookie names, secrets, audiences, origins, callbacks and session scope. WYN domain code performs authorization on every protected action.
+Own the authentication layer in the dedicated API. Use secure, opaque, server-side sessions and **Argon2id through a maintained implementation** for password hashing. Implement email verification, password reset, per-session revocation, and logout-all. Model external identities separately so Google and Apple may be added later.
+
+Consumer and Admin use distinct cookies, secrets, audiences, origins, callbacks, middleware, and session scopes. Every protected operation performs current server-side resource/action authorization. Cryptographic and protocol primitives may use maintained libraries after security review, but no package or hosted provider owns WYN policy.
 
 ## Alternatives
 
-- Auth.js: strong OAuth/session ecosystem but not a complete preferred credentials lifecycle.
-- Clerk/Auth0: lower initial implementation burden but recurring MAU cost, data/vendor lock-in and realm customization concerns.
-- Custom auth or Lucia: custom lifecycle risk; Lucia is not the preferred maintained library direction.
+- Hosted identity provider: lowers initial effort but increases user-data/vendor dependency, ongoing cost, and dual-realm constraints.
+- Turnkey framework authentication: useful primitives, but delegating the full lifecycle would weaken the approved application-owned boundary.
+- Stateless JWT bearer sessions: difficult immediate revocation/logout-all and greater replay exposure for browser sessions.
 
 ## Consequences
 
-WYN retains session data/control and can add OAuth through identities. It accepts patching, email security, abuse controls and adapter review responsibilities. FD-01 and FD-14 block final configuration/launch; replacing the library is possible through internal interfaces but migrations would be sensitive.
+WYN controls account data, revocation, realm isolation, and future identity mapping, but owns security patching, abuse protection, email lifecycle, audit behavior, and extensive regression testing. Detailed account/session/Admin-factor policy and production launch remain subject to their existing security approvals.

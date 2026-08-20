@@ -1,6 +1,6 @@
 # Database and Search Stack
 
-**Status:** PROPOSED — no physical schema or migration is created.
+**Status:** ACCEPTED — no physical schema or migration is created.
 
 ## Decision
 

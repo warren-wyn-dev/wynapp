@@ -1,10 +1,10 @@
 # Media and Object Storage Stack
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 ## Storage
 
-Prefer **Cloudflare R2** behind a WYN-controlled CDN/domain because it is S3-compatible and its public-delivery economics are attractive. **AWS S3 in `ap-southeast-1` plus CloudFront** is the fallback with broader regional/service maturity but potentially higher egress complexity/cost. Supabase Storage is convenient but couples storage authorization to another platform and adds no benefit to the chosen database/runtime.
+Prefer **Cloudflare R2** behind a WYN-controlled CDN/domain because it is S3-compatible and its public-delivery economics are attractive. **AWS S3** is the fallback with broader regional/service maturity but potentially higher egress complexity/cost. Supabase Storage is convenient but couples storage authorization to another platform and adds no benefit to the chosen database/runtime.
 
 Use separate private quarantine and processed namespaces/buckets, separate least-privilege credentials and lifecycle rules. The API creates a bounded upload intent; the client uploads directly using a short-lived signed request. Object keys are opaque and immutable. Database state—not bucket listing—is authoritative. Only processed variants are publishable; private originals/variants use authorization and short-lived URLs/cookies as appropriate.
 

@@ -1,6 +1,6 @@
 # Frontend Stack
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 ## Consumer
 
@@ -8,7 +8,7 @@ Use **Next.js + React + strict TypeScript**. Server rendering/static generation 
 
 PWA support uses a small reviewed service worker rather than a broad plugin: app shell/static assets may be cached, authenticated API responses may not. Queue only explicitly idempotent offline actions. Measure LCP/INP/CLS, paginate with cursors, virtualize only after profiling, reserve image dimensions and default to WebP with AVIF where its CPU/size trade-off wins.
 
-Compared with a React SPA, Next improves SSR/SEO and routing conventions. Remix is credible but gives less organizational leverage for the preferred ecosystem. A native app duplicates V1 delivery and is out of scope. Deployment must use standard Node output/OCI where possible, not provider-only APIs.
+Compared with a React SPA, Next improves SSR/SEO and routing conventions. Remix is credible but gives less organizational leverage for the preferred ecosystem. A native app duplicates V1 delivery and is out of scope. The approved V1 target is Vercel, while application boundaries and portable contracts should limit avoidable provider coupling.
 
 ## Admin
 

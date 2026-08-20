@@ -1,6 +1,6 @@
 # Backend, Validation and Jobs
 
-**Status:** PROPOSED
+**Status:** ACCEPTED
 
 ## API/runtime
 
@@ -10,7 +10,7 @@ Modules follow transport → application/use case → domain → repository/adap
 
 ## Runtime validation and quality
 
-Use Zod for request/response DTOs where useful, environment configuration and shared form constraints. The server independently validates all client values and business invariants. Set TypeScript `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and `useUnknownInCatchVariables`; forbid unchecked `any` at trusted boundaries. ESLint handles correctness/security rules, Prettier formatting, and Conventional Commits communicate intent.
+Use Zod for request/response DTOs where useful, environment configuration and shared form constraints. The server independently validates all client values and business invariants. Set TypeScript `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and `useUnknownInCatchVariables`; forbid unchecked `any` at trusted boundaries. ESLint handles correctness/security rules, Prettier formatting, and Prettier provides consistent formatting.
 
 ## Jobs
 

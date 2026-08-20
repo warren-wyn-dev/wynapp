@@ -1,17 +1,21 @@
 # Authentication Stack
 
-**Status:** PROPOSED — adopting or configuring authentication/security policy requires Founder approval; no implementation is authorized.
+**Status:** ACCEPTED — the technology direction is Founder-approved. Detailed account, Admin-factor, retention, and security-policy choices identified by the architecture remain separate approval gates.
 
 ## Decision
 
-Use maintained, self-hosted **Better Auth** behind WYN-owned interfaces for email/password, verification, reset and database-backed sessions. Store opaque session identifiers only in `Secure`, `HttpOnly`, appropriately `SameSite` cookies; store only token hashes server-side. Use the library's supported password KDF/default after security review, calibrate its cost, and do not replace it casually. Future Google/Apple identities map to separate identity records.
+Build an **application-owned authentication layer** in the dedicated API. V1 supports email and password, email verification, password reset, individual-session revocation, logout of all sessions, and secure server-side sessions. Keep provider-neutral identity records so Google and Apple sign-in can be added later without changing the user identity model; social login is deferred.
 
-Auth.js is strong for OAuth but intentionally does not provide a complete credentials lifecycle. Lucia is no longer the preferred maintained library path. Clerk/Auth0 reduce implementation but add per-user cost, data residency/lock-in and difficult dual-realm customization. A custom protocol maximizes control but creates unacceptable security maintenance in V1.
+Hash passwords with **Argon2id using a maintained implementation**. Store parameters with each hash, calibrate memory/time/parallelism against the production runtime, enforce resource limits, and support rehash-on-login when parameters change. Never log or reversibly encrypt passwords. Verification, reset, and session bearer tokens must be cryptographically random, purpose-bound, short-lived where appropriate, single-use where appropriate, and stored only as hashes server-side.
 
-## Realm and abuse controls
+## Sessions and realm isolation
 
-Consumer and Admin use distinct cookie names, secrets/keys, audiences, callback URLs, origin allowlists, session stores/scopes and middleware. A Consumer credential is never accepted by `/admin/v1`. Admin stronger factors, recovery and permission matrix await FD-14; production Admin must not launch until approved.
+Use opaque session identifiers in `Secure`, `HttpOnly`, appropriately `SameSite` cookies. Rotate session identifiers at authentication and privilege transitions; define idle and absolute expiry; revoke sessions after sensitive credential changes; and make logout-all invalidate every existing session transactionally. Cookie-authenticated mutations require CSRF protection and strict Origin checks.
 
-Verification/reset tokens are random, purpose-bound, short-lived, single-use and hash-stored. Rotate sessions after authentication/privilege events; support revoke-one and logout-all. Apply CSRF plus Origin checks to cookie writes; generic responses/timing, progressive account+IP/network limits and alerts reduce enumeration/brute force without easy victim lockout. Recovery, email change and high-risk Admin actions create redacted security events. Authorization remains WYN domain policy on every action/resource, never a feature of the UI or merely possession of a session.
+Consumer and Admin use distinct cookie names, signing/encryption secrets, audiences, allowed origins, callbacks, middleware, and session scopes. The Admin app is separately deployed. Consumer sessions are rejected on Admin routes and Admin sessions are not a shortcut around resource/action authorization. Every protected action authenticates and then authorizes against current server-side policy.
 
-Before adoption: verify maintenance/security history, pin compatible versions, review adapters and migrations, fuzz session/token flows, and test fixation, replay, cross-realm, cross-user, logout-all and recovery races.
+## Security and operations
+
+Use generic responses and consistent workflows to reduce email enumeration. Apply measured account and network abuse limits without enabling trivial victim lockout. Security-sensitive events—verification, recovery, credential changes, session creation/revocation, and privileged Admin actions—produce redacted audit/security records. Secrets use approved secret storage and rotation.
+
+Required tests cover hashing/rehashing, fixation, replay, expiry, revocation, logout-all, token reuse and races, CSRF, brute force, enumeration, cross-realm acceptance, cross-user access, direct API bypass, and privilege changes. A maintained library may supply low-level primitives only after security review; no third-party package owns WYN policy or the authentication boundary.
