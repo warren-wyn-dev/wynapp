@@ -4,13 +4,13 @@
 
 ## Atomic publication
 
-The API writes the domain change and an `outbox_events` row in the same PostgreSQL transaction. A worker claims committed rows with short leases (`FOR UPDATE SKIP LOCKED` or equivalent), dispatches handlers, and records attempt/next-attempt/processed state. Therefore an event is delivered **at least once**; consumers must be idempotent. Outbox payloads are minimal, versioned facts with IDs, never secrets or unnecessary message content.
+The API writes the domain change and an `outbox_events` row in the same PostgreSQL transaction. A dispatcher uses a versioned event-type registry and atomically creates one `outbox_deliveries` row for every required consumer before recording the event as dispatched. Consumer workers claim their own delivery rows with short leases (`FOR UPDATE SKIP LOCKED` or equivalent) and record attempt/next-attempt/delivered state per consumer. No worker marks the shared event delivered, so one projection cannot hide it from search, feed, ranking, notifications, or any other registered consumer. Delivery is **at least once**; consumers must be idempotent. Outbox payloads are minimal, versioned facts with IDs, never secrets or unnecessary message content.
 
 Envelope fields: immutable event UUID, event type/version, aggregate type/ID/version, occurred-at, producer module, actor/service reference where necessary, request/correlation/causation IDs, trusted distribution scope, and minimal payload. Consumers tolerate unknown additive fields. Events are facts in past tense: `DropCreated`, `DropDeleted`, `UserFollowed`, `DropLiked`, `CommentCreated`, `ClubJoined`, `MessageCreated`, and `ReportCreated`.
 
 ## Retry safety
 
-Each handler maintains an inbox/processing receipt keyed by `(consumer, event_id)` or writes a result with an equivalent unique business key in the same transaction. State transitions use compare-and-set; external effects use deterministic provider keys. Failures use bounded exponential backoff with jitter. Permanent/schema failures enter a dead-letter state with alerting and controlled replay; poison events cannot block the partition indefinitely.
+Each handler maintains an inbox/processing receipt keyed by `(consumer, event_id)` or writes a result with an equivalent unique business key in the same transaction as its projection effect. Only after that transaction succeeds may its delivery row be marked delivered. State transitions use compare-and-set; external effects use deterministic provider keys. Failures use bounded exponential backoff with jitter. Permanent/schema failures enter a per-consumer dead-letter state with alerting and controlled replay; a poison delivery cannot block its partition or suppress delivery to other consumers.
 
 Ordering is guaranteed only per aggregate version where required. Consumers reject/defer gaps and ignore older versions; no global ordering is promised. Ranking uses event occurrence plus server receipt time and recomputation. Cancellation/deletion is expressed as a new event, not mutation of history.
 

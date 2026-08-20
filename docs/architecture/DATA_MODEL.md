@@ -25,7 +25,7 @@ Conventions:
 |---|---|
 | Identity / Authentication | `users`, `identities`, `sessions`, verification and password-reset credentials |
 | Profiles | `profiles` |
-| Social Graph / Safety | `follows`, `follow_requests`, `blocks`, `mutes` |
+| Social Graph | `follows`, `follow_requests`, `blocks`, `mutes` (Safety consumes a read-only policy port) |
 | Drops | `drops`, `drop_media`, `drop_hashtags`, `mentions`, poll relations |
 | Media | `media_assets`, `upload_intents`, media processing attempts |
 | Engagement / Comments | `likes`, `comments`, `redrops`, `saves`, `views`, `engagement_events` |
@@ -71,13 +71,13 @@ Every graph query is bounded and cursor-paginated. The unresolved same-Club bloc
 
 ### `drops`
 
-`drops(id, author_user_id, kind, body, visibility, lifecycle_status, quoted_drop_id?, public_distribution_of_drop_id?, created_at, edited_at, deleted_at, version)`. `kind` distinguishes original/quote behavior without overloading a client flag. Self-consistency checks reject an ID quoting itself; application invariants prevent quote cycles. Index `(author_user_id, created_at, id)` with a live-row predicate, `(visibility, created_at, id)` for public candidates, quoted target, and moderation/lifecycle status. Body search receives a PostgreSQL full-text GIN index only for visible eligible text. Soft deletion clears it from all surfaces while retaining the minimum record required by moderation/retention policy.
+`drops(id, author_user_id, kind, body, visibility, lifecycle_status, quoted_drop_id?, public_distribution_of_drop_id?, created_at, published_at?, edited_at, deleted_at, version)`. `published_at` is server-controlled: it is set once, in the atomic transition from draft to published, and is immutable thereafter. A published Drop may be edited only when `server_now < published_at + interval '30 minutes'`; the trusted edit transaction locks the row and evaluates that predicate against database/server time, never client time, `created_at`, or `edited_at`. `kind` distinguishes original/quote behavior without overloading a client flag. Self-consistency checks reject an ID quoting itself; application invariants prevent quote cycles. Index `(author_user_id, created_at, id)` with a live-row predicate, `(visibility, created_at, id)` for public candidates, quoted target, and moderation/lifecycle status. Body search receives a PostgreSQL full-text GIN index only for visible eligible text. Soft deletion clears it from all surfaces while retaining the minimum record required by moderation/retention policy.
 
 ### Media and the authoritative nine-image invariant
 
 `media_assets` is owned by Media and records owner, purpose, quarantine/permanent object key references (never public trust tokens), detected type, bytes, decoded dimensions/pixel count, checksum, processing status, safe variants metadata, timestamps, expiry, and version. `upload_intents` binds a short-lived upload to owner, purpose, maximum bytes/type, idempotency key, expiry, and consumed state. Only `READY` assets belonging to the acting user and authorized purpose may attach.
 
-`drop_media(drop_id, media_asset_id, position, attached_at)` has a composite primary key `(drop_id, media_asset_id)`, unique `(drop_id, position)`, `CHECK position BETWEEN 1 AND 9`, and unique media attachment according to the approved reuse policy. **A trusted create/edit transaction locks the Drop, rechecks ownership/status and READY assets, writes the complete attachment set, and rejects a count above nine. The future schema must also add a database constraint trigger/deferred invariant that rejects more than nine rows per Drop.** The position check alone is insufficient because sparse or duplicate-attempt patterns must not bypass the count. Request idempotency and the uniqueness constraints make retries safe.
+`drop_media(drop_id, media_asset_id, position, attached_at)` uses zero-based positions and has a composite primary key `(drop_id, media_asset_id)`, unique `(drop_id, position)`, `CHECK position BETWEEN 0 AND 8`, and unique media attachment according to the approved reuse policy. **A trusted create/edit transaction locks the Drop, rechecks ownership/status and READY assets, writes the complete attachment set, and rejects a count above nine. The future schema must also add a database constraint trigger/deferred invariant that rejects more than nine rows per Drop.** The position check alone is insufficient because sparse or duplicate-attempt patterns must not bypass the count. Request idempotency and the uniqueness constraints make retries safe.
 
 ### Topics and references
 
@@ -152,9 +152,9 @@ Admin identities, sessions, and authorization grants use separate relations and 
 
 ## 12. Transactional outbox and projections
 
-`outbox_events(id, aggregate_type, aggregate_id, aggregate_version, event_type, schema_version, payload, occurred_at, available_at, published_at?, attempt_count, locked_until?, last_error_code?, correlation_id)` is inserted in the same transaction as its source fact. Unique `(aggregate_type, aggregate_id, aggregate_version, event_type)` or an explicit idempotency key prevents duplicate logical events. Index the unpublished queue by `(available_at, occurred_at)` with a `published_at IS NULL` predicate and aggregate history by `(aggregate_type, aggregate_id, aggregate_version)`.
+`outbox_events(id, aggregate_type, aggregate_id, aggregate_version, event_type, schema_version, payload, occurred_at, available_at, dispatched_at?, dispatch_attempt_count, dispatch_locked_until?, dispatch_error_code?, correlation_id)` is inserted in the same transaction as its source fact. Unique `(aggregate_type, aggregate_id, aggregate_version, event_type)` or an explicit idempotency key prevents duplicate logical events. A dispatcher claims the `(available_at, occurred_at)` queue where `dispatched_at IS NULL`, reads a versioned registry of required consumers by event type, and in one transaction materializes one `outbox_deliveries(event_id, consumer, available_at, delivered_at?, attempt_count, locked_until?, last_error_code?)` row for **every** required consumer before setting `outbox_events.dispatched_at`. The delivery relation has primary key `(event_id, consumer)` and an available-delivery partial index on `(available_at, event_id)` where `delivered_at IS NULL`; aggregate history is indexed by `(aggregate_type, aggregate_id, aggregate_version)`. A dispatcher crash rolls back both the jobs and marker, and uniqueness makes a retry safe. Adding a consumer requires an explicit replay/backfill decision for earlier events.
 
-Workers claim bounded batches with row locking/skip-locked semantics, use `outbox_event_id` as the idempotency key, retry with backoff, and move poison events to a reviewable dead-letter record without losing the original. `event_consumer_receipts(consumer, event_id, processed_at, result)` has a composite primary key. Search documents, feed candidates, counters, notification grouping, Trending and Top 100 tables are rebuildable projections with `last_event_id`/ruleset version and must apply visibility checks at read time.
+Each consumer worker claims only its bounded delivery rows with row locking/skip-locked semantics, uses `(consumer, event_id)` as the idempotency key, and sets that delivery's `delivered_at` only after its projection transaction succeeds. Retries use backoff and move a poison **delivery** to a reviewable dead-letter record without hiding the event from other consumers. `event_consumer_receipts(consumer, event_id, processed_at, result)` has a composite primary key and is written atomically with the consumer effect; it prevents duplicate handling after a lease expiry. Search documents, feed candidates, counters, notification grouping, Trending and Top 100 tables are rebuildable projections with `last_event_id`/ruleset version and must apply visibility checks at read time.
 
 ## 13. Integrity and concurrency rules
 
@@ -169,7 +169,7 @@ Workers claim bounded batches with row locking/skip-locked semantics, use `outbo
 ## 14. Indexing and query discipline
 
 - Every foreign key used for authorization or cleanup has a supporting index; composite indexes follow equality predicates, then cursor sort columns `(created_at, id)`.
-- Use partial indexes for live/pending/unread/unpublished rows to keep hot indexes small. Never use `OFFSET` for unbounded product lists.
+- Use partial indexes for live/pending/unread/undelivered rows to keep hot indexes small. Never use `OFFSET` for unbounded product lists.
 - PostgreSQL full-text GIN supports eligible Drop/topic/Club text; `pg_trgm` GIN/GiST supports normalized username, display name, hashtag and Club-name tolerance. Search queries first apply visibility, block, status, and membership predicates.
 - At 1k DAU, avoid premature table partitioning. Candidate first partitions at measured growth are high-volume `views`, `engagement_events`, `audit_logs`, and `outbox_events`, based on size/maintenance latency—not DAU alone.
 - Query plans for feeds, inboxes, moderation queues, graph lists and searches require representative staging review. Add indexes from measured plans; do not index every column.

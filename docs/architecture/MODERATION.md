@@ -18,14 +18,15 @@ This design does not add automated/AI moderation, law-enforcement workflows, liv
 
 | Module | Owns / responsibility | May call or consume | Public interface (conceptual, not frozen endpoints) |
 |---|---|---|---|
-| Safety | blocks, mutes, report submission validation, reporter confidentiality, abuse controls | Identity/Auth policy; target resolver interfaces; outbox | `submitReport`, `canReport`, `block`, `mute`; `ReportCreated` |
+| Safety | report submission validation, reporter confidentiality, abuse controls, and centralized evaluation of block/mute privacy policy through the Social Graph port | Identity/Auth policy; Social Graph policy port; target resolver interfaces; outbox | `submitReport`, `canReport`, `canView`, `canInteract`; `ReportCreated` |
+| Social Graph | sole owner of `blocks` and `mutes`, their mutation commands, and atomic removal of conflicting follows/pending requests | Identity; Safety consumes its narrow policy query port | `block`, `unblock`, `mute`, `unmute`, `getInteractionEdges`; `BlockChanged`, `MuteChanged` |
 | Moderation | cases, assignments, review state, decisions, actions, appeals/resolution | Safety report projection; target modules through narrow enforcement ports; Admin permission; Audit; outbox | `open/triage/assignCase`, `recordDecision`, `applyAction`, `submit/reviewAppeal`; action/status events |
 | Target modules (Profiles, Drops, Comments, Clubs, Chat) | authoritative target existence/owner/visibility/status; enforcement of action | consumes moderation status/action through defined policy/projection | `resolveModerationTarget`, `applyModerationEffect`, `canViewerAccess` |
 | Admin | separate UI/session; queue/search/detail/action orchestration | Moderation interfaces only; no direct mutation of target tables | permission-scoped views/commands |
 | Audit | append-only important action record and protected retrieval | accepts structured audit append in the same transaction where feasible | `appendAuditEvent`, permission-scoped query |
 | Notifications | policy-approved notices to reporter/target | consumes committed events; rechecks visibility/block/preferences | `ModerationNoticeRequested` consumption |
 
-Dependencies are directional: Admin → Moderation → target-module ports/Audit; Safety → Moderation via report/outbox. Target modules must not depend on Admin. Audit records facts but never drives authorization or moderation state.
+Dependencies are directional: Admin → Moderation → target-module ports/Audit; Safety → Moderation via report/outbox; Safety → Social Graph's read-only policy port. All block/mute writes enter through Social Graph, which owns the transaction that creates/removes the edge and removes conflicting follows or pending requests; Safety never duplicates those commands or writes graph tables. Target modules must not depend on Admin. Audit records facts but never drives authorization or moderation state.
 
 ## 3. Logical records and privacy ownership
 
