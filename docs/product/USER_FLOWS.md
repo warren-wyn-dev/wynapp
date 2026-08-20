@@ -52,6 +52,12 @@
 
 **Failure behavior:** หาก network/server error ทำให้ยืนยันการ invalidate ไม่ได้ client ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แต่ต้องไม่แสดงว่า Logout สำเร็จ; แสดงสถานะปลอดภัยว่า session อาจยัง active พร้อม Retry โดยไม่เปิดเผย credential/session detail และ retry ต้องไม่ทำให้เกิด session ใหม่
 
+**P0 verification scenarios:**
+
+- **Successful invalidation:** หลังได้รับผลสำเร็จ การเรียก protected action และการต่ออายุ session ด้วย credential เดิมต้องถูกปฏิเสธ
+- **Idempotent replay:** การส่ง Logout ซ้ำด้วย credential เดิม รวมถึงกรณี session หมดอายุหรือถูก invalidate ไปแล้ว ต้องยังได้สถานะ logged-out โดยไม่สร้าง session/credential ใหม่และไม่เปิดเผยว่า session เคยมีอยู่หรือไม่
+- **Unconfirmed invalidation:** เมื่อจำลอง network timeout หรือ server failure ก่อนยืนยันผล UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย
+
 ## UF-04 Create Drop
 
 1. ผู้ใช้เปิด composer
