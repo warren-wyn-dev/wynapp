@@ -68,6 +68,10 @@ WYN V1.0.0 คือแพลตฟอร์มโซเชียลแบบ mo
 - protected action ต้องยืนยันตัวตนและตรวจ authorization ที่ server; error ต้องไม่เปิดเผย credential หรือข้อมูล private
 - เมื่อ Logout สำเร็จ server ต้อง invalidate active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นก่อนแสดงผลสำเร็จ; credential ดังกล่าวต้องไม่สามารถใช้เข้าถึง protected action หรือสร้าง session ใหม่ได้อีก
 - Logout ต้องเป็น idempotent: การส่งคำขอซ้ำหรือ logout session ที่ invalid/หมดอายุแล้วต้องได้ผลลัพธ์เป็น logged-out โดยไม่สร้าง session ใหม่หรือเปิดเผยรายละเอียดของ session
+- หาก server ยืนยันการ invalidate ไม่สำเร็จ ระบบต้องไม่แสดงว่า Logout สำเร็จ ต้องล้าง credential ออกจากอุปกรณ์เท่าที่ทำได้ แสดงสถานะที่ปลอดภัยว่าอาจยังมี active session และให้ผู้ใช้ retry ได้; ห้าม fallback เป็นการล้าง client state เพียงอย่างเดียวแล้วถือว่า logout สำเร็จ
+
+**ข้อเสนอที่รอ Founder Decision FD-15 (ยังไม่ใช่ Acceptance criteria และห้ามนำไปออกแบบหรือ implement):**
+
 - เมื่อสร้าง session server ต้องออก revocation handle แบบสุ่มที่ผูกกับ session และเก็บแยกจาก credential ที่ใช้ authenticate; handle นี้ใช้ได้ครั้งเดียวและใช้ได้เฉพาะสั่ง invalidate session ที่ผูกไว้เท่านั้น ต้องใช้เข้าถึง protected action, ต่ออายุ session หรือสร้าง session ใหม่ไม่ได้
 - หาก server ยืนยันการ invalidate ไม่สำเร็จ ระบบต้องไม่แสดงว่า Logout สำเร็จ ต้องล้าง credential ที่ใช้ authenticate และข้อมูล private ออกจากอุปกรณ์เท่าที่ทำได้ แต่เก็บ revocation handle ไว้เฉพาะใน pending-logout state เพื่อให้ Retry ยัง invalidate session เดิมได้; แสดงสถานะที่ปลอดภัยว่าอาจยังมี active session และห้าม fallback เป็นการล้าง client state เพียงอย่างเดียวแล้วถือว่า logout สำเร็จ
 - client ต้องลบ revocation handle เมื่อ server ยืนยันว่า session ถูก invalidate แล้วหรือเมื่อ handle หมดอายุ; server ต้องทำให้ handle ใช้ซ้ำไม่ได้หลัง invalidate สำเร็จ และการ Retry ด้วย handle ต้องไม่ authenticate ผู้ใช้ ไม่ทำให้เกิด session ใหม่ และไม่เปิดเผยรายละเอียดของ session
@@ -305,7 +309,8 @@ Admin roles: **OWNER, SUPER_ADMIN, MODERATOR, SUPPORT, ANALYST, CONTENT_ADMIN**
 | FD-12 | Profile Likes tab visibility และรายการ Followers/Following visibility | กระทบ privacy expectations |
 | FD-13 | Report taxonomy, moderation SLA, appeal eligibility/process และ user notice | กระทบ fairness และ operations |
 | FD-14 | Admin role-permission matrix, stronger authentication และ audit/UGC retention | เป็น security-policy decision ที่ต้องอนุมัติ |
-| FD-15 | KPI เป้าหมายและ non-functional targets สำหรับ V1 | ใช้ตัดสิน release readiness และ capacity |
+| FD-15 | อนุมัติหรือปฏิเสธกลไก one-time session revocation handle และ lifecycle แบบ pending-logout | เป็น authentication-architecture/security-policy change; หากไม่อนุมัติให้ rollback โดยตัดข้อเสนอและใช้ Logout/retry เดิมที่ไม่เพิ่ม bearer capability จนกว่าจะมีแนวทางที่อนุมัติ |
+| FD-16 | KPI เป้าหมายและ non-functional targets สำหรับ V1 | ใช้ตัดสิน release readiness และ capacity |
 
 ## 8. Risks และ CTO Review Notes
 
