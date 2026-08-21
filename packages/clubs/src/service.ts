@@ -1,5 +1,5 @@
 /* PostgreSQL rows are constrained by the migration and all input is parameterized. */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 

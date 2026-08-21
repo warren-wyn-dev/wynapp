@@ -20,6 +20,7 @@ const labels: Record<string, string> = {
   TRENDING_ACHIEVED: 'Drop ของคุณกำลังติดเทรนด์',
   TOP100_ACHIEVED: 'คุณติด WYN Top 100',
   SYSTEM_ANNOUNCEMENT: 'ประกาศจาก WYN',
+  CHAT_MESSAGE: 'ส่งข้อความถึงคุณ',
 };
 export default function Page() {
   const [items, setItems] = useState<Item[]>([]),

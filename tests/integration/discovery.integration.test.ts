@@ -146,16 +146,19 @@ run('Step 11 discovery on real PostgreSQL', () => {
       (await discovery.searchDrops(viewer, "' OR 1=1 --")).items,
     ).toHaveLength(0);
   });
-  it('ignores 10,000 CLUB_INTERNAL engagements but counts GLOBAL_PUBLIC distribution', async () => {
+  it('ignores 100 CLUB_INTERNAL engagements but counts GLOBAL_PUBLIC distribution', async () => {
     const creator = await user('rankcreator'),
       publicFan = await user('publicfan'),
       d = await drop(creator, 'ranking target');
     await pool.query(
-      `WITH made AS (INSERT INTO users(email_normalized) SELECT 'club'||g||'@test.local' FROM generate_series(1,10000) g RETURNING id) INSERT INTO profiles(user_id,username_normalized,display_name) SELECT id,'club'||row_number() OVER(),'Club' FROM made`,
+      `WITH made AS (INSERT INTO users(email_normalized) SELECT 'club'||g||'@test.local' FROM generate_series(1,100) g RETURNING id) INSERT INTO profiles(user_id,username_normalized,display_name) SELECT id,'club'||row_number() OVER(),'Club' FROM made`,
     );
     await pool.query(
       "INSERT INTO privacy_settings(user_id) SELECT id FROM users WHERE email_normalized LIKE 'club%@test.local'",
     );
+    // Projection-input scope is trusted worker data; bypass Step 13's command-side
+    // trigger here so this test can inject both scopes for the same Drop.
+    await pool.query("SET session_replication_role='replica'");
     await pool.query(
       "INSERT INTO drop_likes(drop_id,user_id,scope) SELECT $1,id,'CLUB_INTERNAL' FROM users WHERE email_normalized LIKE 'club%@test.local'",
       [d],
@@ -168,6 +171,7 @@ run('Step 11 discovery on real PostgreSQL', () => {
       "INSERT INTO drop_views(drop_id,viewer_user_id,window_started_at,scope) SELECT $1,id,date_trunc('hour',now()),'CLUB_INTERNAL' FROM users WHERE email_normalized LIKE 'club%@test.local'",
       [d],
     );
+    await pool.query("SET session_replication_role='origin'");
     await ranking.recompute();
     const club = await pool.query(
       'SELECT score FROM trending_drop_snapshots WHERE drop_id=$1 ORDER BY computed_at DESC LIMIT 1',

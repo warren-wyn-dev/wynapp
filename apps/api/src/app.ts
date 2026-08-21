@@ -62,6 +62,7 @@ import {
   NotificationService,
 } from '../../../packages/notifications/src/index.js';
 import { ClubError, ClubService } from '../../../packages/clubs/src/index.js';
+import { ChatError, ChatService } from '../../../packages/chat/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -189,6 +190,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   const discovery = new DiscoveryService(pool);
   const notifications = new NotificationService(pool);
   const clubs = new ClubService(pool);
+  const chat = new ChatService(pool);
   const engageLimited = {
     config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
   };
@@ -2214,6 +2216,161 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       });
     } catch (e) {
       return clubFailure(e, reply, req.requestId);
+    }
+  });
+  const chatRead = {
+    preHandler: [consumer],
+    config: { rateLimit: { max: 90, timeWindow: '1 minute' } },
+  };
+  const chatWrite = {
+    preHandler: [consumer, csrf],
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+  };
+  function chatFailure(error: unknown, reply: FastifyReply, requestId: string) {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The chat request is invalid.',
+        requestId,
+      );
+    if (error instanceof ChatError)
+      return fail(
+        reply,
+        error.code === 'NOT_FOUND'
+          ? 404
+          : error.code === 'REQUEST_PENDING'
+            ? 409
+            : 403,
+        error.code,
+        'The chat operation is unavailable.',
+        requestId,
+      );
+    throw error;
+  }
+  app.get('/v1/conversations', chatRead, async (req, reply) =>
+    reply.send({
+      data: { items: await chat.list(req.auth!.userId) },
+      request_id: req.requestId,
+    }),
+  );
+  app.post('/v1/conversations', chatWrite, async (req, reply) => {
+    try {
+      return reply
+        .code(201)
+        .send({
+          data: await chat.create(
+            req.auth!.userId,
+            z.object({ targetUserId: z.uuid() }).parse(req.body).targetUserId,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/message-requests', chatRead, async (req, reply) =>
+    reply.send({
+      data: { items: await chat.requests(req.auth!.userId) },
+      request_id: req.requestId,
+    }),
+  );
+  for (const action of ['accept', 'reject'] as const)
+    app.post(
+      `/v1/message-requests/:id/${action}`,
+      chatWrite,
+      async (req, reply) => {
+        try {
+          return reply.send({
+            data: await chat.decide(
+              uuid.parse((req.params as { id: string }).id),
+              req.auth!.userId,
+              action === 'accept' ? 'ACCEPTED' : 'DECLINED',
+              req.requestId,
+            ),
+            request_id: req.requestId,
+          });
+        } catch (e) {
+          return chatFailure(e, reply, req.requestId);
+        }
+      },
+    );
+  app.get('/v1/conversations/:id/messages', chatRead, async (req, reply) => {
+    try {
+      return reply.send({
+        data: {
+          items: await chat.messages(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth!.userId,
+            req.query,
+          ),
+        },
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/conversations/:id/messages', chatWrite, async (req, reply) => {
+    try {
+      return reply
+        .code(201)
+        .send({
+          data: await chat.send(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth!.userId,
+            req.body,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/conversations/:id/read', chatWrite, async (req, reply) => {
+    try {
+      const sequence = z
+        .object({ sequence: z.number().int().nonnegative() })
+        .parse(req.body).sequence;
+      return reply.send({
+        data: await chat.read(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth!.userId,
+          sequence,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete('/v1/messages/:id', chatWrite, async (req, reply) => {
+    try {
+      await chat.remove(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth!.userId,
+        req.requestId,
+      );
+      return reply.code(204).send();
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/messages/:id/report', chatWrite, async (req, reply) => {
+    try {
+      await chat.report(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth!.userId,
+        z.object({ reason: z.string() }).parse(req.body).reason,
+      );
+      return reply
+        .code(202)
+        .send({ data: { accepted: true }, request_id: req.requestId });
+    } catch (e) {
+      return chatFailure(e, reply, req.requestId);
     }
   });
   return app;

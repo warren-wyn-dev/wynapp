@@ -65,6 +65,7 @@ const notificationEvents = [
   'TrendingAchieved',
   'Top100Achieved',
   'SystemAnnouncementPublished',
+  'MessageCreated',
 ];
 /** PostgreSQL is the queue. Claim leases are short and failures become visible dead letters after five attempts. */
 export class NotificationWorker {

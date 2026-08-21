@@ -115,6 +115,9 @@ importers:
       '@wyn/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@wyn/chat':
+        specifier: workspace:*
+        version: link:../../packages/chat
       '@wyn/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -226,6 +229,19 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+
+  packages/chat:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
 
   packages/clubs:
     dependencies:
