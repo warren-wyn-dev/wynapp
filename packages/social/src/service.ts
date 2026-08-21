@@ -1,23 +1,298 @@
 import type { Pool, PoolClient } from 'pg';
 import { canBlock, canFollow, canMute } from './policies.js';
 
-type EventName = 'UserFollowed'|'UserUnfollowed'|'FollowRequested'|'FollowRequestApproved'|'FollowRequestRejected'|'FollowRequestCancelled'|'FollowerRemoved'|'UserBlocked'|'UserUnblocked';
-export type FollowResult = { state: 'FOLLOWING' } | { state: 'REQUESTED'; requestId: string };
-const pairLock = (c: PoolClient, a: string, b: string) => c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [[a,b].sort().join(':')]);
-async function event(c:PoolClient,type:EventName,actorId:string,targetId:string,requestId:string){await c.query("INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id) VALUES($1,'User',$2::uuid,jsonb_build_object('actor_id',$2::uuid::text,'target_id',$3::uuid::text),$4)",[type,actorId,targetId,requestId]);}
+type EventName =
+  | 'UserFollowed'
+  | 'UserUnfollowed'
+  | 'FollowRequested'
+  | 'FollowRequestApproved'
+  | 'FollowRequestRejected'
+  | 'FollowRequestCancelled'
+  | 'FollowerRemoved'
+  | 'UserBlocked'
+  | 'UserUnblocked';
+export type FollowResult =
+  | { state: 'FOLLOWING' }
+  | { state: 'REQUESTED'; requestId: string };
+const pairLock = (c: PoolClient, a: string, b: string) =>
+  c.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+    [a, b].sort().join(':'),
+  ]);
+async function event(
+  c: PoolClient,
+  type: EventName,
+  actorId: string,
+  targetId: string,
+  requestId: string,
+) {
+  await c.query(
+    "INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id) VALUES($1,'User',$2::uuid,jsonb_build_object('actor_id',$2::uuid::text,'target_id',$3::uuid::text),$4)",
+    [type, actorId, targetId, requestId],
+  );
+}
 
 export class SocialService {
   constructor(private readonly pool: Pool) {}
-  private async tx<T>(fn:(c:PoolClient)=>Promise<T>):Promise<T>{const c=await this.pool.connect();try{await c.query('BEGIN');const result=await fn(c);await c.query('COMMIT');return result}catch(error){await c.query('ROLLBACK');throw error}finally{c.release()}}
-  async follow(actorId:string,targetId:string,requestId:string):Promise<FollowResult>{return this.tx(async c=>{await pairLock(c,actorId,targetId);if(!canFollow({viewerId:actorId,targetId,blockedEitherWay:false,accountVisibility:'PUBLIC',viewerFollowsTarget:false}))throw new SocialError('INVALID_RELATIONSHIP');const blocked=await c.query('SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',[actorId,targetId]);if(blocked.rowCount)throw new SocialError('NOT_FOUND');const target=await c.query("SELECT ps.account_visibility FROM users u JOIN privacy_settings ps ON ps.user_id=u.id WHERE u.id=$1 AND u.account_state IN ('ACTIVE','RESTRICTED') FOR UPDATE",[targetId]);if(!target.rowCount)throw new SocialError('NOT_FOUND');if(target.rows[0].account_visibility==='PUBLIC'){const inserted=await c.query('INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING follower_id',[actorId,targetId]);await c.query("UPDATE follow_requests SET status='CONVERTED',resolved_at=now() WHERE requester_id=$1 AND target_id=$2 AND status='PENDING'",[actorId,targetId]);if(inserted.rowCount)await event(c,'UserFollowed',actorId,targetId,requestId);return {state:'FOLLOWING'}}const exists=await c.query('SELECT 1 FROM follows WHERE follower_id=$1 AND followed_id=$2',[actorId,targetId]);if(exists.rowCount)return {state:'FOLLOWING'};const inserted=await c.query("INSERT INTO follow_requests(requester_id,target_id) VALUES($1,$2) ON CONFLICT (requester_id,target_id) WHERE status='PENDING' DO NOTHING RETURNING id",[actorId,targetId]);if(inserted.rowCount)await event(c,'FollowRequested',actorId,targetId,requestId);const pendingId=inserted.rows[0]?.id??(await c.query("SELECT id FROM follow_requests WHERE requester_id=$1 AND target_id=$2 AND status='PENDING'",[actorId,targetId])).rows[0].id;return {state:'REQUESTED',requestId:pendingId}})}
-  async unfollow(actorId:string,targetId:string,requestId:string):Promise<void>{await this.tx(async c=>{await pairLock(c,actorId,targetId);const q=await c.query('DELETE FROM follows WHERE follower_id=$1 AND followed_id=$2 RETURNING follower_id',[actorId,targetId]);if(q.rowCount)await event(c,'UserUnfollowed',actorId,targetId,requestId)})}
-  async resolveRequest(actorId:string,id:string,decision:'APPROVED'|'REJECTED',requestId:string):Promise<void>{await this.tx(async c=>{const q=await c.query("SELECT requester_id,target_id FROM follow_requests WHERE id=$1 AND status='PENDING' FOR UPDATE",[id]);if(!q.rowCount)throw new SocialError('NOT_FOUND');const r=q.rows[0];if(r.target_id!==actorId)throw new SocialError('NOT_FOUND');await pairLock(c,r.requester_id,r.target_id);const blocked=await c.query('SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',[r.requester_id,r.target_id]);if(decision==='APPROVED'&&!blocked.rowCount)await c.query('INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[r.requester_id,r.target_id]);await c.query('UPDATE follow_requests SET status=$1,resolved_at=now() WHERE id=$2',[blocked.rowCount?'REJECTED':decision,id]);await event(c,decision==='APPROVED'&&!blocked.rowCount?'FollowRequestApproved':'FollowRequestRejected',actorId,r.requester_id,requestId)})}
-  async cancelRequest(actorId:string,id:string,requestId:string):Promise<void>{await this.tx(async c=>{const q=await c.query("UPDATE follow_requests SET status='CANCELLED',resolved_at=now() WHERE id=$1 AND requester_id=$2 AND status='PENDING' RETURNING target_id",[id,actorId]);if(!q.rowCount)throw new SocialError('NOT_FOUND');await event(c,'FollowRequestCancelled',actorId,q.rows[0].target_id,requestId)})}
-  async removeFollower(actorId:string,followerId:string,requestId:string):Promise<void>{await this.tx(async c=>{await pairLock(c,actorId,followerId);const q=await c.query('DELETE FROM follows WHERE follower_id=$1 AND followed_id=$2 RETURNING follower_id',[followerId,actorId]);if(q.rowCount)await event(c,'FollowerRemoved',actorId,followerId,requestId)})}
-  async block(actorId:string,targetId:string,requestId:string):Promise<void>{if(!canBlock(actorId,targetId))throw new SocialError('INVALID_RELATIONSHIP');await this.tx(async c=>{await pairLock(c,actorId,targetId);const inserted=await c.query('INSERT INTO blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING blocker_id',[actorId,targetId]);await c.query('DELETE FROM follows WHERE (follower_id=$1 AND followed_id=$2) OR (follower_id=$2 AND followed_id=$1)',[actorId,targetId]);await c.query("UPDATE follow_requests SET status='CANCELLED',resolved_at=now() WHERE status='PENDING' AND ((requester_id=$1 AND target_id=$2) OR (requester_id=$2 AND target_id=$1))",[actorId,targetId]);if(inserted.rowCount)await event(c,'UserBlocked',actorId,targetId,requestId)})}
-  async unblock(actorId:string,targetId:string,requestId:string):Promise<void>{await this.tx(async c=>{await pairLock(c,actorId,targetId);const q=await c.query('DELETE FROM blocks WHERE blocker_id=$1 AND blocked_id=$2 RETURNING blocker_id',[actorId,targetId]);if(q.rowCount)await event(c,'UserUnblocked',actorId,targetId,requestId)})}
-  async mute(actorId:string,targetId:string):Promise<void>{if(!canMute(actorId,targetId))throw new SocialError('INVALID_RELATIONSHIP');await this.pool.query('INSERT INTO mutes(muter_id,muted_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[actorId,targetId])}
-  async unmute(actorId:string,targetId:string):Promise<void>{await this.pool.query('DELETE FROM mutes WHERE muter_id=$1 AND muted_id=$2',[actorId,targetId])}
-  async makePublic(actorId:string,requestId:string):Promise<void>{await this.tx(async c=>{await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[actorId]);await c.query("UPDATE privacy_settings SET account_visibility='PUBLIC',updated_at=now() WHERE user_id=$1",[actorId]);const pending=await c.query("SELECT id,requester_id FROM follow_requests WHERE target_id=$1 AND status='PENDING' ORDER BY id FOR UPDATE",[actorId]);for(const row of pending.rows){await pairLock(c,row.requester_id,actorId);const blocked=await c.query('SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',[row.requester_id,actorId]);if(!blocked.rowCount){const inserted=await c.query('INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING follower_id',[row.requester_id,actorId]);if(inserted.rowCount)await event(c,'UserFollowed',row.requester_id,actorId,requestId)}await c.query("UPDATE follow_requests SET status='CONVERTED',resolved_at=now() WHERE id=$1",[row.id])}})}
+  private async tx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+    const c = await this.pool.connect();
+    try {
+      await c.query('BEGIN');
+      const result = await fn(c);
+      await c.query('COMMIT');
+      return result;
+    } catch (error) {
+      await c.query('ROLLBACK');
+      throw error;
+    } finally {
+      c.release();
+    }
+  }
+  async follow(
+    actorId: string,
+    targetId: string,
+    requestId: string,
+  ): Promise<FollowResult> {
+    return this.tx(async (c) => {
+      await pairLock(c, actorId, targetId);
+      if (
+        !canFollow({
+          viewerId: actorId,
+          targetId,
+          blockedEitherWay: false,
+          accountVisibility: 'PUBLIC',
+          viewerFollowsTarget: false,
+        })
+      )
+        throw new SocialError('INVALID_RELATIONSHIP');
+      const blocked = await c.query(
+        'SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',
+        [actorId, targetId],
+      );
+      if (blocked.rowCount) throw new SocialError('NOT_FOUND');
+      const target = await c.query(
+        "SELECT ps.account_visibility FROM users u JOIN privacy_settings ps ON ps.user_id=u.id WHERE u.id=$1 AND u.account_state IN ('ACTIVE','RESTRICTED') FOR UPDATE",
+        [targetId],
+      );
+      if (!target.rowCount) throw new SocialError('NOT_FOUND');
+      if (target.rows[0].account_visibility === 'PUBLIC') {
+        const inserted = await c.query(
+          'INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING follower_id',
+          [actorId, targetId],
+        );
+        await c.query(
+          "UPDATE follow_requests SET status='CONVERTED',resolved_at=now() WHERE requester_id=$1 AND target_id=$2 AND status='PENDING'",
+          [actorId, targetId],
+        );
+        if (inserted.rowCount)
+          await event(c, 'UserFollowed', actorId, targetId, requestId);
+        return { state: 'FOLLOWING' };
+      }
+      const exists = await c.query(
+        'SELECT 1 FROM follows WHERE follower_id=$1 AND followed_id=$2',
+        [actorId, targetId],
+      );
+      if (exists.rowCount) return { state: 'FOLLOWING' };
+      const inserted = await c.query(
+        "INSERT INTO follow_requests(requester_id,target_id) VALUES($1,$2) ON CONFLICT (requester_id,target_id) WHERE status='PENDING' DO NOTHING RETURNING id",
+        [actorId, targetId],
+      );
+      if (inserted.rowCount)
+        await event(c, 'FollowRequested', actorId, targetId, requestId);
+      const pendingId =
+        inserted.rows[0]?.id ??
+        (
+          await c.query(
+            "SELECT id FROM follow_requests WHERE requester_id=$1 AND target_id=$2 AND status='PENDING'",
+            [actorId, targetId],
+          )
+        ).rows[0].id;
+      return { state: 'REQUESTED', requestId: pendingId };
+    });
+  }
+  async unfollow(
+    actorId: string,
+    targetId: string,
+    requestId: string,
+  ): Promise<void> {
+    await this.tx(async (c) => {
+      await pairLock(c, actorId, targetId);
+      const q = await c.query(
+        'DELETE FROM follows WHERE follower_id=$1 AND followed_id=$2 RETURNING follower_id',
+        [actorId, targetId],
+      );
+      if (q.rowCount)
+        await event(c, 'UserUnfollowed', actorId, targetId, requestId);
+    });
+  }
+  async resolveRequest(
+    actorId: string,
+    id: string,
+    decision: 'APPROVED' | 'REJECTED',
+    requestId: string,
+  ): Promise<void> {
+    await this.tx(async (c) => {
+      const q = await c.query(
+        "SELECT requester_id,target_id FROM follow_requests WHERE id=$1 AND status='PENDING' FOR UPDATE",
+        [id],
+      );
+      if (!q.rowCount) throw new SocialError('NOT_FOUND');
+      const r = q.rows[0];
+      if (r.target_id !== actorId) throw new SocialError('NOT_FOUND');
+      await pairLock(c, r.requester_id, r.target_id);
+      const blocked = await c.query(
+        'SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',
+        [r.requester_id, r.target_id],
+      );
+      if (decision === 'APPROVED' && !blocked.rowCount)
+        await c.query(
+          'INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
+          [r.requester_id, r.target_id],
+        );
+      await c.query(
+        'UPDATE follow_requests SET status=$1,resolved_at=now() WHERE id=$2',
+        [blocked.rowCount ? 'REJECTED' : decision, id],
+      );
+      await event(
+        c,
+        decision === 'APPROVED' && !blocked.rowCount
+          ? 'FollowRequestApproved'
+          : 'FollowRequestRejected',
+        actorId,
+        r.requester_id,
+        requestId,
+      );
+    });
+  }
+  async cancelRequest(
+    actorId: string,
+    id: string,
+    requestId: string,
+  ): Promise<void> {
+    await this.tx(async (c) => {
+      const q = await c.query(
+        "UPDATE follow_requests SET status='CANCELLED',resolved_at=now() WHERE id=$1 AND requester_id=$2 AND status='PENDING' RETURNING target_id",
+        [id, actorId],
+      );
+      if (!q.rowCount) throw new SocialError('NOT_FOUND');
+      await event(
+        c,
+        'FollowRequestCancelled',
+        actorId,
+        q.rows[0].target_id,
+        requestId,
+      );
+    });
+  }
+  async removeFollower(
+    actorId: string,
+    followerId: string,
+    requestId: string,
+  ): Promise<void> {
+    await this.tx(async (c) => {
+      await pairLock(c, actorId, followerId);
+      const q = await c.query(
+        'DELETE FROM follows WHERE follower_id=$1 AND followed_id=$2 RETURNING follower_id',
+        [followerId, actorId],
+      );
+      if (q.rowCount)
+        await event(c, 'FollowerRemoved', actorId, followerId, requestId);
+    });
+  }
+  async block(
+    actorId: string,
+    targetId: string,
+    requestId: string,
+  ): Promise<void> {
+    if (!canBlock(actorId, targetId))
+      throw new SocialError('INVALID_RELATIONSHIP');
+    await this.tx(async (c) => {
+      await pairLock(c, actorId, targetId);
+      const inserted = await c.query(
+        'INSERT INTO blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING blocker_id',
+        [actorId, targetId],
+      );
+      await c.query(
+        'DELETE FROM follows WHERE (follower_id=$1 AND followed_id=$2) OR (follower_id=$2 AND followed_id=$1)',
+        [actorId, targetId],
+      );
+      await c.query(
+        "UPDATE follow_requests SET status='CANCELLED',resolved_at=now() WHERE status='PENDING' AND ((requester_id=$1 AND target_id=$2) OR (requester_id=$2 AND target_id=$1))",
+        [actorId, targetId],
+      );
+      if (inserted.rowCount)
+        await event(c, 'UserBlocked', actorId, targetId, requestId);
+    });
+  }
+  async unblock(
+    actorId: string,
+    targetId: string,
+    requestId: string,
+  ): Promise<void> {
+    await this.tx(async (c) => {
+      await pairLock(c, actorId, targetId);
+      const q = await c.query(
+        'DELETE FROM blocks WHERE blocker_id=$1 AND blocked_id=$2 RETURNING blocker_id',
+        [actorId, targetId],
+      );
+      if (q.rowCount)
+        await event(c, 'UserUnblocked', actorId, targetId, requestId);
+    });
+  }
+  async mute(actorId: string, targetId: string): Promise<void> {
+    if (!canMute(actorId, targetId))
+      throw new SocialError('INVALID_RELATIONSHIP');
+    await this.pool.query(
+      'INSERT INTO mutes(muter_id,muted_id) VALUES($1,$2) ON CONFLICT DO NOTHING',
+      [actorId, targetId],
+    );
+  }
+  async unmute(actorId: string, targetId: string): Promise<void> {
+    await this.pool.query(
+      'DELETE FROM mutes WHERE muter_id=$1 AND muted_id=$2',
+      [actorId, targetId],
+    );
+  }
+  async makePublic(actorId: string, requestId: string): Promise<void> {
+    await this.tx(async (c) => {
+      await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [actorId]);
+      await c.query(
+        "UPDATE privacy_settings SET account_visibility='PUBLIC',updated_at=now() WHERE user_id=$1",
+        [actorId],
+      );
+      const pending = await c.query(
+        "SELECT id,requester_id FROM follow_requests WHERE target_id=$1 AND status='PENDING' ORDER BY id FOR UPDATE",
+        [actorId],
+      );
+      for (const row of pending.rows) {
+        await pairLock(c, row.requester_id, actorId);
+        const blocked = await c.query(
+          'SELECT 1 FROM blocks WHERE (blocker_id=$1 AND blocked_id=$2) OR (blocker_id=$2 AND blocked_id=$1)',
+          [row.requester_id, actorId],
+        );
+        if (!blocked.rowCount) {
+          const inserted = await c.query(
+            'INSERT INTO follows(follower_id,followed_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING follower_id',
+            [row.requester_id, actorId],
+          );
+          if (inserted.rowCount)
+            await event(
+              c,
+              'UserFollowed',
+              row.requester_id,
+              actorId,
+              requestId,
+            );
+        }
+        await c.query(
+          "UPDATE follow_requests SET status='CONVERTED',resolved_at=now() WHERE id=$1",
+          [row.id],
+        );
+      }
+    });
+  }
 }
-export class SocialError extends Error { constructor(readonly code:'INVALID_RELATIONSHIP'|'NOT_FOUND'){super(code)} }
+export class SocialError extends Error {
+  constructor(readonly code: 'INVALID_RELATIONSHIP' | 'NOT_FOUND') {
+    super(code);
+  }
+}

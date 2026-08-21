@@ -1,2 +1,22 @@
 import { RelationshipActions } from './relationship-actions';
-export default async function Profile({params}:{params:Promise<{username:string}>}){const {username}=await params;return <section className="card"><div className="avatar"/><h1>@{username}</h1><p className="muted">โปรไฟล์ส่วนตัวจะแสดงรายละเอียดให้ผู้ติดตามที่ได้รับอนุมัติเท่านั้น</p><RelationshipActions username={username}/><nav className="nav"><a href={`/u/${username}/followers`}>ผู้ติดตาม</a><a href={`/u/${username}/following`}>กำลังติดตาม</a></nav></section>}
+export default async function Profile({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+  return (
+    <section className="card">
+      <div className="avatar" />
+      <h1>@{username}</h1>
+      <p className="muted">
+        โปรไฟล์ส่วนตัวจะแสดงรายละเอียดให้ผู้ติดตามที่ได้รับอนุมัติเท่านั้น
+      </p>
+      <RelationshipActions username={username} />
+      <nav className="nav">
+        <a href={`/u/${username}/followers`}>ผู้ติดตาม</a>
+        <a href={`/u/${username}/following`}>กำลังติดตาม</a>
+      </nav>
+    </section>
+  );
+}

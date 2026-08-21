@@ -1,1 +1,13 @@
-export default function Delete(){return <section className="card"><h1>ขอลบบัญชี</h1><p>บัญชีจะเข้าสู่สถานะรอดำเนินการ ไม่ถูกลบทันที</p><label>ยืนยันรหัสผ่าน<input type="password"/></label><button>ส่งคำขอลบบัญชี</button></section>}
+export default function Delete() {
+  return (
+    <section className="card">
+      <h1>ขอลบบัญชี</h1>
+      <p>บัญชีจะเข้าสู่สถานะรอดำเนินการ ไม่ถูกลบทันที</p>
+      <label>
+        ยืนยันรหัสผ่าน
+        <input type="password" />
+      </label>
+      <button>ส่งคำขอลบบัญชี</button>
+    </section>
+  );
+}

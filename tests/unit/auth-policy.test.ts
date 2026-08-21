@@ -1,2 +1,40 @@
-import {describe,expect,it} from 'vitest'; import {mayAuthenticate,normalizeEmail,normalizeUsername,passwordSchema,usernameSchema} from '../../packages/auth/src/policy.js'; import {hashToken,issueToken,tokenMatches} from '../../packages/auth/src/crypto.js';
-describe('identity policy',()=>{it('normalizes identifiers',()=>{expect(normalizeEmail(' Foo@Example.COM ')).toBe('foo@example.com');expect(normalizeUsername(' Alice_1 ')).toBe('alice_1')});it('rejects reserved and invalid usernames',()=>{expect(()=>usernameSchema.parse('Admin')).toThrow();expect(()=>usernameSchema.parse('bad-name')).toThrow();expect(usernameSchema.parse('Good_Name')).toBe('good_name')});it('enforces password strength',()=>{expect(()=>passwordSchema.parse('weakpassword')).toThrow();expect(passwordSchema.parse('GoodPassword1!')).toBe('GoodPassword1!')});it('hashes tokens without storing raw values',()=>{const t=issueToken();expect(t.hash).not.toContain(t.raw);expect(tokenMatches(t.raw,t.hash)).toBe(true);expect(hashToken(t.raw)).toBe(t.hash)});it('enforces states',()=>{expect(mayAuthenticate('ACTIVE')).toBe(true);expect(mayAuthenticate('RESTRICTED')).toBe(true);expect(mayAuthenticate('SUSPENDED')).toBe(false);expect(mayAuthenticate('DELETION_PENDING')).toBe(false)})});
+import { describe, expect, it } from 'vitest';
+import {
+  mayAuthenticate,
+  normalizeEmail,
+  normalizeUsername,
+  passwordSchema,
+  usernameSchema,
+} from '../../packages/auth/src/policy.js';
+import {
+  hashToken,
+  issueToken,
+  tokenMatches,
+} from '../../packages/auth/src/crypto.js';
+describe('identity policy', () => {
+  it('normalizes identifiers', () => {
+    expect(normalizeEmail(' Foo@Example.COM ')).toBe('foo@example.com');
+    expect(normalizeUsername(' Alice_1 ')).toBe('alice_1');
+  });
+  it('rejects reserved and invalid usernames', () => {
+    expect(() => usernameSchema.parse('Admin')).toThrow();
+    expect(() => usernameSchema.parse('bad-name')).toThrow();
+    expect(usernameSchema.parse('Good_Name')).toBe('good_name');
+  });
+  it('enforces password strength', () => {
+    expect(() => passwordSchema.parse('weakpassword')).toThrow();
+    expect(passwordSchema.parse('GoodPassword1!')).toBe('GoodPassword1!');
+  });
+  it('hashes tokens without storing raw values', () => {
+    const t = issueToken();
+    expect(t.hash).not.toContain(t.raw);
+    expect(tokenMatches(t.raw, t.hash)).toBe(true);
+    expect(hashToken(t.raw)).toBe(t.hash);
+  });
+  it('enforces states', () => {
+    expect(mayAuthenticate('ACTIVE')).toBe(true);
+    expect(mayAuthenticate('RESTRICTED')).toBe(true);
+    expect(mayAuthenticate('SUSPENDED')).toBe(false);
+    expect(mayAuthenticate('DELETION_PENDING')).toBe(false);
+  });
+});
