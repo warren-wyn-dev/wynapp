@@ -29,7 +29,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['apps/api/src/app.ts'],
+    files: ['apps/api/src/app.ts', 'packages/social/src/service.ts'],
     ...tseslint.configs.disableTypeChecked,
   },
   {

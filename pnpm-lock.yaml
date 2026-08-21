@@ -242,6 +242,19 @@ importers:
         specifier: 9.6.0
         version: 9.6.0
 
+  packages/social:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+
   packages/types: {}
 
   packages/ui:
