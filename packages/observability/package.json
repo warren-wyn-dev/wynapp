@@ -16,7 +16,7 @@
     "test": "vitest run src --passWithNoTests"
   },
   "dependencies": {
+    "@sentry/node": "8.55.2",
     "pino": "9.6.0"
-  },
-  "devDependencies": {}
+  }
 }

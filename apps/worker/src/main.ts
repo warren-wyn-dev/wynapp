@@ -5,6 +5,7 @@ import {
   MediaWorker,
   createS3MediaStorageFromEnv,
 } from '@wyn/media';
+import { createSentryErrorCapture, noopErrorCapture } from '@wyn/observability';
 import pg from 'pg';
 import { z } from 'zod';
 import { NotificationWorker, workerLogger } from './worker.js';
@@ -12,11 +13,16 @@ import { NotificationWorker, workerLogger } from './worker.js';
 const config = z
   .object({
     WORKER_ID: z.string().min(1).default('local-worker'),
+    WYN_ENV: z.string().default('development'),
     DATABASE_URL: z.string().min(1),
     WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
     WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+    OBSERVABILITY_DSN: z.string().min(1).optional(),
   })
   .parse(process.env);
+const errorCapture = config.OBSERVABILITY_DSN
+  ? createSentryErrorCapture(config.OBSERVABILITY_DSN, config.WYN_ENV)
+  : noopErrorCapture;
 
 const pool = new pg.Pool({ connectionString: config.DATABASE_URL });
 const notificationWorker = new NotificationWorker(pool);
@@ -63,6 +69,7 @@ async function loop(name: string, step: () => Promise<string>): Promise<void> {
         { err: error, consumer: name },
         'dispatch loop iteration failed',
       );
+      errorCapture.capture(error, { consumer: name });
       await delay(config.WORKER_POLL_INTERVAL_MS);
     }
   }
