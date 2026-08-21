@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import {
+  ADMIN_ORIGIN,
+  ADMIN_PORT,
   API_ORIGIN,
   API_PORT,
   MOCK_S3_PORT,
@@ -58,6 +60,13 @@ export default defineConfig({
       reuseExistingServer: reuse,
       timeout: 60000,
       env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(WEB_PORT) },
+    },
+    {
+      command: 'pnpm --filter @wyn/admin start',
+      url: `${ADMIN_ORIGIN}/login`,
+      reuseExistingServer: reuse,
+      timeout: 60000,
+      env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(ADMIN_PORT) },
     },
     {
       // Nothing in apps/worker's deployable entrypoint previously called

@@ -12,8 +12,7 @@ import {
 
 // Runs once before the API/Web servers start. Resets the disposable local
 // test database to a known schema and seeds a single admin principal used by
-// the admin-api E2E coverage (there is no Admin frontend to drive yet, see
-// tests/e2e/admin-api.spec.ts).
+// the admin-api and admin-ui E2E coverage.
 export default async function globalSetup(): Promise<void> {
   assertTestDatabase(TEST_DATABASE_URL);
   const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
