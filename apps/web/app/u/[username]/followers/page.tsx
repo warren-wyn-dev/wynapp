@@ -1,0 +1,1 @@
+export default async function Followers({params}:{params:Promise<{username:string}>}){const{username}=await params;return <section className="card"><h1>ผู้ติดตาม @{username}</h1><p className="muted">ยังไม่มีผู้ติดตาม หรือรายการนี้ไม่พร้อมใช้งาน</p></section>}
