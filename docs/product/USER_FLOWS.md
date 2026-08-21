@@ -43,7 +43,7 @@
 
 **Precondition:** ผู้ใช้มีหรือเคยมี active session บนอุปกรณ์
 
-**Success:** active session และ credential สำหรับต่ออายุ session ที่ผูกกับ session นั้นถูก invalidate ที่ server และไม่สามารถใช้กับ protected action หรือสร้าง session ใหม่ได้
+**Success:** active session และ credential ทุกชนิดที่ server ออกให้แก่ login/session เดียวกัน (รวม access credential ที่ยังไม่หมดอายุและ refresh/renewal credential) ถูก invalidate ที่ server และไม่สามารถใช้กับ protected action หรือสร้าง session ใหม่ได้ การ Logout อุปกรณ์หนึ่งไม่ขยายเป็น “ออกจากทุกอุปกรณ์” เว้นแต่ Founder อนุมัติ capability นั้นแยกต่างหาก
 
 **Completion boundary:** ระบบถือว่า Logout สำเร็จได้ต่อเมื่อ server ยืนยัน postcondition ข้างต้นแล้วเท่านั้น การล้าง client state, การปิดหน้าจอ หรือการได้รับ network response ที่ไม่ยืนยันผล ไม่ถือเป็นความสำเร็จ
 
@@ -59,6 +59,7 @@
 **P0 verification scenarios:**
 
 - **Successful invalidation:** หลังได้รับผลสำเร็จ การเรียก protected action และการต่ออายุ session ด้วย credential เดิมต้องถูกปฏิเสธ
+- **Session-family coverage and race:** credential ทุกชนิดที่ออกภายใต้ login/session เดียวกันต้องถูกปฏิเสธหลัง response สำเร็จ รวม access credential ที่ไม่ได้ส่งมากับคำขอ Logout และ protected/renewal request ที่แข่งกับ Logout ต้องไม่สามารถทำให้ session กลับมา active หรือออก credential ใหม่หลัง completion boundary
 - **Idempotent replay:** การส่ง Logout ซ้ำด้วย credential เดิม รวมถึงกรณี session หมดอายุหรือถูก invalidate ไปแล้ว ต้องยังได้สถานะ logged-out โดยไม่สร้าง session/credential ใหม่และไม่เปิดเผยว่า session เคยมีอยู่หรือไม่
 - **Unconfirmed invalidation:** เมื่อจำลอง network timeout หรือ server failure ก่อนยืนยันผล UI ต้องไม่แสดง success, ต้องไม่พาผู้ใช้กลับเข้า authenticated surface ด้วย credential เดิม และต้องแสดงคำเตือนกับ Retry ที่ปลอดภัย; credential ที่แยกเก็บเพื่อ retry ต้องใช้ไม่ได้กับ protected action/การต่ออายุ session และถูกลบหลัง server ยืนยันผล
 - **Client-only clearing is insufficient:** เมื่อจำลอง client ที่ล้าง local state โดยไม่มีผลยืนยันจาก server credential เดิมต้องไม่ถูกนับว่า invalidate แล้ว และ test ต้องไม่รายงาน Logout ว่าสำเร็จ
