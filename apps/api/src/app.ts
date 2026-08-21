@@ -31,6 +31,7 @@ import {
 } from '../../../packages/auth/src/schemas.js';
 import {
   ADMIN_COOKIE,
+  clearAdminCookies,
   clearConsumerCookies,
   CONSUMER_COOKIE,
   CSRF_COOKIE,
@@ -1000,6 +1001,19 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       data: { authenticated: true, role: req.admin!.role },
       request_id: req.requestId,
     }),
+  );
+  app.post(
+    '/admin/v1/auth/logout',
+    { preHandler: [admin, adminCsrf] },
+    async (req, reply) => {
+      if (!req.admin) return;
+      await pool.query(
+        "UPDATE sessions SET revoked_at=now(),revocation_reason='LOGOUT' WHERE id=$1",
+        [req.admin.sessionId],
+      );
+      clearAdminCookies(reply);
+      return reply.code(204).send();
+    },
   );
   app.post(
     '/v1/reports',
