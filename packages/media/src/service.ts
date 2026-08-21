@@ -168,10 +168,15 @@ export class MediaService {
       throw error;
     }
   }
-  async get(owner: string, id: string) {
+  async get(viewer: string | undefined, id: string) {
+    // Once an asset is READY it's meant to be publicly viewable (it's
+    // rendered as a plain <img src="/v1/media/:id"> for Drop images,
+    // avatars, etc. by anyone who can see the content it's attached to —
+    // and the underlying storage URL has no auth of its own either). While
+    // still processing, only the owner can poll its status.
     const q = await this.pool.query(
-      "SELECT id,purpose,status,width,height,thumbnail_key,feed_variant_key,full_variant_key,created_at,processed_at FROM media_assets WHERE id=$1 AND owner_user_id=$2 AND status<>'DELETED'",
-      [id, owner],
+      "SELECT id,purpose,status,width,height,thumbnail_key,feed_variant_key,full_variant_key,created_at,processed_at FROM media_assets WHERE id=$1 AND status<>'DELETED' AND (owner_user_id=$2 OR status='READY')",
+      [id, viewer ?? null],
     );
     if (!q.rowCount) throw new MediaError('NOT_FOUND');
     const a = q.rows[0];

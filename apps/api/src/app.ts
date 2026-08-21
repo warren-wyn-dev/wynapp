@@ -1445,28 +1445,72 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       }
     },
   );
-  app.get('/v1/media/:id', { preHandler: [consumer] }, async (req, reply) => {
-    if (!req.auth) return;
-    if (!media)
-      return fail(
-        reply,
-        503,
-        'MEDIA_UNAVAILABLE',
-        'Media storage is unavailable.',
-        req.requestId,
-      );
-    try {
-      return reply.send({
-        data: await media.get(
-          req.auth.userId,
+  app.get(
+    '/v1/media/:id',
+    { preHandler: [optionalConsumer] },
+    async (req, reply) => {
+      if (!media)
+        return fail(
+          reply,
+          503,
+          'MEDIA_UNAVAILABLE',
+          'Media storage is unavailable.',
+          req.requestId,
+        );
+      try {
+        return reply.send({
+          data: await media.get(
+            req.auth?.userId,
+            uuid.parse((req.params as { id: string }).id),
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return mediaFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  const mediaVariant = z.enum(['thumbnail', 'feed', 'full']);
+  app.get(
+    '/v1/media/:id/file',
+    { preHandler: [optionalConsumer] },
+    async (req, reply) => {
+      // GET /v1/media/:id returns JSON (used for upload-progress polling by
+      // drop-composer.tsx/media-picker.tsx); this is the counterpart the
+      // frontend actually needs for `<img src>` — <img> can't do anything
+      // with a JSON response, and nothing served real image bytes before.
+      if (!media)
+        return fail(
+          reply,
+          503,
+          'MEDIA_UNAVAILABLE',
+          'Media storage is unavailable.',
+          req.requestId,
+        );
+      try {
+        const parsedVariant = mediaVariant.safeParse(
+          (req.query as { variant?: string }).variant,
+        );
+        const variant = parsedVariant.success ? parsedVariant.data : 'feed';
+        const asset = await media.get(
+          req.auth?.userId,
           uuid.parse((req.params as { id: string }).id),
-        ),
-        request_id: req.requestId,
-      });
-    } catch (error) {
-      return mediaFailure(error, reply, req.requestId);
-    }
-  });
+        );
+        const urls = (asset as { urls?: Record<string, string> }).urls;
+        if (!urls)
+          return fail(
+            reply,
+            404,
+            'NOT_READY',
+            'The media is not ready.',
+            req.requestId,
+          );
+        return reply.redirect(urls[variant]!, 302);
+      } catch (error) {
+        return mediaFailure(error, reply, req.requestId);
+      }
+    },
+  );
   app.delete(
     '/v1/media/:id',
     { ...mediaLimited, preHandler: [consumer, csrf] },

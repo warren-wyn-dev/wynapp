@@ -69,7 +69,7 @@ export function DropCard({ drop }: { drop: FeedDrop }) {
           {drop.media.map((media, index) => (
             <img
               key={media.id}
-              src={`/v1/media/${media.id}`}
+              src={`/v1/media/${media.id}/file`}
               alt={`รูปที่ ${index + 1}`}
               loading="lazy"
             />

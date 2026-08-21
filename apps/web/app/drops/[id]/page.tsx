@@ -62,7 +62,11 @@ export default function DropDetail({
       {drop.caption && <p>{drop.caption}</p>}
       <div className="drop-images">
         {drop.media.map((m, i) => (
-          <img key={m.id} src={`/v1/media/${m.id}`} alt={`รูปที่ ${i + 1}`} />
+          <img
+            key={m.id}
+            src={`/v1/media/${m.id}/file?variant=full`}
+            alt={`รูปที่ ${i + 1}`}
+          />
         ))}
       </div>
       <p>

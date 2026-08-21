@@ -117,4 +117,71 @@ test.describe('Media upload', () => {
     expect(created.status()).toBe(201);
     expect((await created.json()).data.avatar_media_id).toBe(avatarMediaId);
   });
+
+  test('a READY Drop image can be viewed by someone other than its uploader', async ({
+    request,
+  }) => {
+    const author = uniqueUser('mediaviewauthor');
+    const viewer = uniqueUser('mediaviewviewer');
+    await request.post('/v1/auth/register', { data: author });
+    await request.post('/v1/auth/register', { data: viewer });
+
+    const authorHeaders = await loginApi(request, author);
+    const mediaId = await uploadAndProcess(
+      request,
+      authorHeaders,
+      'DROP_IMAGE',
+    );
+
+    const drop = await request.post('/v1/drops', {
+      headers: { ...authorHeaders, 'idempotency-key': crypto.randomUUID() },
+      data: { body: 'a drop with a picture', mediaIds: [mediaId] },
+    });
+    expect(drop.status()).toBe(201);
+
+    // GET /v1/media/:id was previously owner-only for every status,
+    // including READY, so this 404'd for anyone but the uploader — the web
+    // app's <img src="/v1/media/:id"> for other people's Drop images could
+    // never load.
+    const viewerHeaders = await loginApi(request, viewer);
+    const asViewer = await request.get(`/v1/media/${mediaId}`, {
+      headers: viewerHeaders,
+    });
+    expect(asViewer.ok()).toBeTruthy();
+    expect((await asViewer.json()).data.urls.feed).toBeTruthy();
+
+    // The actual <img src> the frontend now points at: a redirect straight
+    // to the CDN URL, reachable with no session at all.
+    const anonymousFile = await request.fetch(`/v1/media/${mediaId}/file`, {
+      maxRedirects: 0,
+    });
+    expect(anonymousFile.status()).toBe(302);
+    expect(anonymousFile.headers().location).toContain(mediaId);
+  });
+
+  test('a still-processing upload stays private to its uploader', async ({
+    request,
+  }) => {
+    const owner = uniqueUser('mediaprivacyowner');
+    const stranger = uniqueUser('mediaprivacystranger');
+    await request.post('/v1/auth/register', { data: owner });
+    await request.post('/v1/auth/register', { data: stranger });
+
+    const ownerHeaders = await loginApi(request, owner);
+    const intent = await request.post('/v1/media/upload-intents', {
+      headers: { ...ownerHeaders, 'content-type': 'application/json' },
+      data: {
+        purpose: 'PROFILE_AVATAR',
+        mime: 'image/png',
+        bytes: PNG_1X1.byteLength,
+      },
+    });
+    const mediaId = (await intent.json()).data.id as string;
+
+    const strangerHeaders = await loginApi(request, stranger);
+    const asStranger = await request.get(`/v1/media/${mediaId}`, {
+      headers: strangerHeaders,
+    });
+    expect(asStranger.status()).toBe(404);
+  });
 });
