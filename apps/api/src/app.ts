@@ -61,6 +61,7 @@ import {
   NotificationError,
   NotificationService,
 } from '../../../packages/notifications/src/index.js';
+import { ClubError, ClubService } from '../../../packages/clubs/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -187,6 +188,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   const engagement = new EngagementService(pool);
   const discovery = new DiscoveryService(pool);
   const notifications = new NotificationService(pool);
+  const clubs = new ClubService(pool);
   const engageLimited = {
     config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
   };
@@ -2004,12 +2006,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     async (req, reply) => {
       if (!req.auth) return;
       try {
-        return reply
-          .code(201)
-          .send({
-            data: await notifications.subscribe(req.auth.userId, req.body),
-            request_id: req.requestId,
-          });
+        return reply.code(201).send({
+          data: await notifications.subscribe(req.auth.userId, req.body),
+          request_id: req.requestId,
+        });
       } catch (e) {
         return notificationFailure(e, reply, req.requestId);
       }
@@ -2031,5 +2031,190 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       }
     },
   );
+  const clubRead = { preHandler: [optionalConsumer] };
+  const clubWrite = { preHandler: [consumer, csrf], ...socialLimited };
+  const clubFailure = (e: unknown, reply: FastifyReply, requestId: string) => {
+    if (e instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The Club request is invalid.',
+        requestId,
+      );
+    if (e instanceof ClubError)
+      return fail(
+        reply,
+        e.code === 'NOT_FOUND'
+          ? 404
+          : e.code === 'FORBIDDEN' || e.code === 'OWNER_PROTECTED'
+            ? 403
+            : 409,
+        e.code,
+        'The Club operation is unavailable.',
+        requestId,
+      );
+    const code = (e as { code?: string }).code;
+    if (code === '23505' || code === '23514')
+      return fail(
+        reply,
+        409,
+        'CLUB_CONSTRAINT',
+        'The Club operation conflicts with current state.',
+        requestId,
+      );
+    throw e;
+  };
+  app.post('/v1/clubs', clubWrite, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.code(201).send({
+        data: await clubs.create(req.auth.userId, req.body, req.requestId),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/clubs/search', clubRead, async (req, reply) =>
+    reply.send({
+      data: {
+        items: await clubs.search(
+          String((req.query as { q?: string }).q ?? ''),
+        ),
+      },
+      request_id: req.requestId,
+    }),
+  );
+  app.get('/v1/clubs/:slug', clubRead, async (req, reply) => {
+    try {
+      return reply.send({
+        data: await clubs.get(
+          (req.params as { slug: string }).slug,
+          req.auth?.userId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/clubs/:slug/join', clubWrite, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await clubs.join(
+          (req.params as { slug: string }).slug,
+          req.auth.userId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete('/v1/clubs/:slug/membership', clubWrite, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await clubs.leave((req.params as { slug: string }).slug, req.auth.userId);
+      return reply.code(204).send();
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete(
+    '/v1/clubs/:slug/join-requests/:id',
+    clubWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        const p = req.params as { slug: string; id: string };
+        await clubs.cancel(p.slug, uuid.parse(p.id), req.auth.userId);
+        return reply.code(204).send();
+      } catch (e) {
+        return clubFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  for (const decision of ['approve', 'reject'] as const)
+    app.post(
+      `/v1/clubs/:slug/join-requests/:id/${decision}`,
+      clubWrite,
+      async (req, reply) => {
+        if (!req.auth) return;
+        try {
+          const p = req.params as { slug: string; id: string };
+          return reply.send({
+            data: await clubs.decide(
+              p.slug,
+              uuid.parse(p.id),
+              req.auth.userId,
+              decision === 'approve' ? 'APPROVED' : 'REJECTED',
+              req.requestId,
+            ),
+            request_id: req.requestId,
+          });
+        } catch (e) {
+          return clubFailure(e, reply, req.requestId);
+        }
+      },
+    );
+  app.patch(
+    '/v1/clubs/:slug/members/:userId/role',
+    clubWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        const p = req.params as { slug: string; userId: string };
+        const role = z
+          .enum(['ADMIN', 'MODERATOR', 'MEMBER'])
+          .parse((req.body as { role?: unknown }).role);
+        return reply.send({
+          data: await clubs.setRole(
+            p.slug,
+            uuid.parse(p.userId),
+            role,
+            req.auth.userId,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (e) {
+        return clubFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.get('/v1/clubs/:slug/drops', clubRead, async (req, reply) => {
+    try {
+      const q = req.query as { cursor?: string; sort?: string };
+      return reply.send({
+        data: await clubs.feed(
+          (req.params as { slug: string }).slug,
+          req.auth?.userId,
+          q.cursor,
+          q.sort === 'popular',
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/clubs/:slug/trending', clubRead, async (req, reply) => {
+    try {
+      return reply.send({
+        data: {
+          items: await clubs.trending(
+            (req.params as { slug: string }).slug,
+            req.auth?.userId,
+          ),
+        },
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
   return app;
 }
