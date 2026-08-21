@@ -24,6 +24,7 @@ CREATE TABLE follow_requests (
   )
 );
 CREATE UNIQUE INDEX follow_requests_pending_pair_uq ON follow_requests (requester_id, target_id) WHERE status = 'PENDING';
+CREATE INDEX follow_requests_requester_pending_idx ON follow_requests (requester_id, target_id) WHERE status = 'PENDING';
 CREATE INDEX follow_requests_incoming_page_idx ON follow_requests (target_id, created_at DESC, id DESC) WHERE status = 'PENDING';
 
 CREATE TABLE blocks (
@@ -43,4 +44,5 @@ CREATE TABLE mutes (
   PRIMARY KEY (muter_id, muted_id),
   CONSTRAINT mutes_no_self CHECK (muter_id <> muted_id)
 );
+CREATE INDEX mutes_target_lookup_idx ON mutes (muted_id, muter_id);
 CREATE INDEX mutes_page_idx ON mutes (muter_id, created_at DESC, muted_id DESC);
