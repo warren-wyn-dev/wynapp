@@ -1,144 +1,177 @@
 # WYN V1.0.0 Final Acceptance
 
-**Decision: NOT READY FOR PRODUCTION**
+**FINAL RESULT: NOT READY FOR PRODUCTION**
 
-Verification date: 2026-08-21 (UTC)  
-Target: `main` / `origin/main`  
-Git SHA: `64ead35060717e4fb10c41d0367f472c91798cbb`
+Verification date: 2026-08-21 (UTC)
+Target reviewed: `main` / `origin/main`
+Main commit SHA: `6ad0db1fb4398c96904de2b239e6a06ed010aa77`
+
+No production deployment, production migration, production data operation, traffic change, merge, branch deletion, or force-push was performed.
 
 ## Executive release gate
 
-The final acceptance run stopped at the mandatory Step 2 stop condition. The synchronized `main` history contains merged delivery through Step 14 only. The repository explicitly states that the global moderation center remains Step 15 and is not implemented. No Step 15 or Step 16 delivery PR or commit was found on `main`, and no corresponding remote implementation branch was found. Continuing the clean-install, test, migration, build, security, privacy, journey, observability, or recovery gates would not establish V1.0.0 acceptance while required implementation is absent.
+Steps 1–16 are represented in synchronized `main`: the numbered product/foundation work through Step 15 is in merge history, migration `0010_step15_admin_moderation.sql` is present, and PR #36 supplies the Step 16 production-readiness delivery. The full runnable gate was therefore attempted.
 
-No production deployment, production migration, production-data operation, traffic change, branch deletion, merge, or force-push was performed.
+The release is **not ready**. The mandatory E2E command contains only one deliberately skipped placeholder test, so no deployed Consumer/Admin end-to-end journey was executed. Production configuration is absent from this isolated runner and cannot be accepted. Several explicitly requested adversarial cases (including complete CSRF and session/token replay validation) do not have executable end-to-end evidence. These are HIGH release blockers even though install, static checks, unit tests, real-PostgreSQL integration tests, fresh migrations, build, dependency audit, 10,000-event Club isolation, and an isolated backup/restore exercise passed.
 
-## 1. Main verification
+## 1. Main commit SHA
 
-| Check                      | Result   | Evidence                                                                                                          |
-| -------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fetch/pull                 | PASS     | `git fetch origin --prune`; `git pull --ff-only origin main` reported already up to date.                         |
-| Working tree before report | PASS     | Clean.                                                                                                            |
-| Main synchronized          | PASS     | `main` and `origin/main` both resolved to the recorded SHA.                                                       |
-| Steps 1–16 present         | **FAIL** | Merge history reaches Step 14; Step 15 is explicitly documented as unimplemented; Step 16 delivery was not found. |
-| Unresolved Git conflicts   | PASS     | No unmerged index entries or conflict markers were found.                                                         |
+`main` and `origin/main` were synchronized at `6ad0db1fb4398c96904de2b239e6a06ed010aa77`. `git fetch origin --prune`, checkout of `main`, and `git pull --ff-only origin main` completed. The tree was clean before verification.
 
-## 2. Git and PR state
+## 2. Step 1–16 verification
 
-GitHub's public API reported one open PR: PR #23, **Step 6: Identity, Authentication, Sessions and Profile foundations**, from `codex/implement-identity-and-authentication-system` to `main`. Its head is not merged as a branch tip, although later main history includes identity/authentication and social-graph merge work. This stale or unfinished PR requires human disposition; it was not modified or closed.
+| Gate                          | Result          | Evidence                                                                                                                                                                                                                                                          |
+| ----------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Steps 1–5                     | PASS            | Foundation, product, architecture, technology, and engineering documents are present in main history.                                                                                                                                                             |
+| Steps 6–10                    | PASS            | Identity/auth/profile, social graph, media, Drop, and engagement deliveries and migrations `0001`–`0005` are present.                                                                                                                                             |
+| Steps 11–15                   | PASS            | Discovery, notifications, clubs, chat, and Admin/moderation merges are present; migrations run through `0010_step15_admin_moderation.sql`.                                                                                                                        |
+| Step 16                       | PASS            | Production-readiness PR #36 is merged at the reviewed main tip.                                                                                                                                                                                                   |
+| Important unresolved delivery | REVIEW REQUIRED | Public GitHub API reports open PR #23 (Step 6 identity/auth). Later conflict-resolution and Step 7 work containing the delivery are merged, so it appears stale/superseded, but a maintainer must disposition it. Older non-ancestor remote branches also remain. |
 
-Recent merged delivery PRs found were #30 (Step 11), #31 (Step 12), #32 (Step 13), and #33 (Step 14). No Step 15 or Step 16 PR was returned. Multiple older remote branches are not ancestors of current `main`; they appear primarily related to earlier product/auth review iterations. They were not deleted. Their continued necessity and any duplicate implementation must be reviewed by maintainers.
+No unresolved index entries or conflict markers were found.
 
-**Stop-condition result:** important required V1.0.0 implementation is not in `main`. Verification stopped and the release is blocked.
+## 3. Install
 
-## 3–7. Install, static quality, tests, migrations, and build
+**PASS.** `pnpm install --frozen-lockfile` completed with the lockfile unchanged. pnpm warned that dependency build scripts (including `argon2` and `esbuild`) were ignored; builds and tests nevertheless completed.
 
-| Gate                                | Result                                            |
-| ----------------------------------- | ------------------------------------------------- |
-| `pnpm install --frozen-lockfile`    | NOT RUN — mandatory stop condition reached first. |
-| Format, lint, typecheck             | NOT RUN — mandatory stop condition reached first. |
-| Unit, integration, E2E              | NOT RUN — mandatory stop condition reached first. |
-| Fresh isolated PostgreSQL migration | NOT RUN — mandatory stop condition reached first. |
-| Integration tests on fresh schema   | NOT RUN — mandatory stop condition reached first. |
-| Production build                    | NOT RUN — mandatory stop condition reached first. |
+## 4. Lint and formatting
 
-Mandatory tests were not reported as passing and were not silently skipped.
+**PASS.** `pnpm format:check` passed. `pnpm lint` completed 32/32 Turbo tasks successfully.
 
-## 8–13. Security, privacy, isolation, journeys, and observability
+## 5. Typecheck
 
-These gates are **UNVERIFIED** because the release stop condition was reached before execution:
+**PASS.** `pnpm typecheck` completed 32/32 Turbo tasks successfully.
 
-- dependency audit and the zero-CRITICAL/zero-HIGH gate;
-- authentication, sessions, authorization, CSRF, CORS, ownership, moderation, IDOR, XSS, injection, upload validation, and secret-leakage regression;
-- private-account, blocking, private-club, chat, saved-drop, mute, and Admin/Consumer isolation;
-- the mandatory 10,000-event `CLUB_INTERNAL` versus `GLOBAL_PUBLIC` trending-isolation test;
-- core user and Admin journeys, including all named roles;
-- structured logging, IDs, health/readiness, worker failures, error capture, metrics, audit logging, and sensitive-log exclusion.
+## 6. Unit tests
 
-An unverified security or privacy release gate cannot be treated as passing.
+**PASS.** `pnpm test` completed 32/32 Turbo tasks successfully. This covers package policy/schema tests and application smoke-level tests, but it is not a substitute for deployed E2E validation.
 
-## 14. Backup and restore
+## 7. Integration tests
 
-**NOT RUN.** No non-production PostgreSQL environment or media recovery target was supplied or exercised before the stop condition. Backup readiness is not claimed. A successful database backup, restore, integrity check, and media-recovery validation remain mandatory.
+**PASS after correct test-database privilege setup.** A local disposable PostgreSQL 16 database was used through `TEST_DATABASE_URL`. The first run used a normal database owner and failed because the trending fixture intentionally executes `SET session_replication_role='replica'`, which PostgreSQL restricts to a superuser. After granting the disposable test role the required local-only test privilege, the unchanged suite passed: **9 files, 47 tests**.
 
-## 15. Production configuration status
+The passing real-database suite exercises authentication-adjacent constraints, profile/privacy, follow/private requests, block/mute, Drop engagement, likes/comments/replies, ReDrop/quote, saves/views, following/discovery/search, trending/Top Creator projection, notifications, clubs, chat, reporting, moderation, Admin authorization, and audit behavior. Some UI journeys and some named adversarial cases remain unverified as described below.
 
-The verification environment did not expose production configuration. Values were not printed or inspected.
+## 8. E2E
 
-| Requirement          | Status  |
-| -------------------- | ------- |
-| `DATABASE_URL`       | MISSING |
-| Session secrets      | MISSING |
-| Cookie configuration | MISSING |
-| CORS origins         | MISSING |
-| Consumer domain      | MISSING |
-| Admin domain         | MISSING |
-| API domain           | MISSING |
-| Object storage       | MISSING |
-| CDN                  | MISSING |
-| Email                | MISSING |
-| Push                 | MISSING |
-| Realtime             | MISSING |
-| Observability        | MISSING |
-| Rate limiting        | MISSING |
+**FAIL — HIGH blocker.** `pnpm test:e2e` exited successfully only because its sole test is marked skipped: **1 skipped, 0 executed**. Authentication/session, profile/privacy, media upload, nine-image Drop, feeds, search, notifications, Club, 1:1 chat, reports, Admin, appeals, and audit-log workflows were not demonstrated through running Consumer/Admin applications.
 
-These statuses describe only the isolated verification environment and do not assert that production itself lacks the settings. Production configuration still requires secret-safe validation in the approved environment.
+## 9. Migrations
 
-## 16. Production safety
+**PASS in disposable PostgreSQL.** The integration harness repeatedly dropped and recreated the empty `public` schema and migrated from `0001_step6_identity.sql` through `0010_step15_admin_moderation.sql`. All 47 integration tests passed on the resulting schema. No production migration was run.
 
-**UNVERIFIED.** Debug/test endpoints, development credentials, secure cookies, HTTPS expectations, production database guards, Admin `noindex`, safe error responses, rate limits, and safe feature-flag defaults were not accepted.
+## 10. Build
 
-## Results summary
+**PASS.** `pnpm build` completed 20/20 Turbo tasks. Consumer and Admin Next.js production builds compiled, typechecked, generated routes, and completed successfully. Next.js emitted a non-blocking warning that its ESLint plugin was not detected.
 
-| Area                              | Result                              |
-| --------------------------------- | ----------------------------------- |
-| Git synchronization               | PASS                                |
-| Required Step 1–16 implementation | **FAIL**                            |
-| Clean install                     | NOT RUN                             |
-| Static quality                    | NOT RUN                             |
-| Full test suite                   | NOT RUN                             |
-| Fresh migrations                  | NOT RUN                             |
-| Build                             | NOT RUN                             |
-| Security                          | UNVERIFIED                          |
-| Privacy                           | UNVERIFIED                          |
-| Trending isolation                | UNVERIFIED                          |
-| User/Admin journeys               | UNVERIFIED                          |
-| Observability                     | UNVERIFIED                          |
-| Backup/restore                    | NOT RUN                             |
-| Production configuration          | MISSING in verification environment |
-| Production safety                 | UNVERIFIED                          |
+## 11. Dependency audit
 
-## Blockers and unresolved issues
+**PASS at requested threshold.** `pnpm audit --audit-level high` exited successfully with **0 HIGH and 0 CRITICAL** findings. It reported 9 lower-severity findings: 7 moderate and 2 low. These should be tracked but do not violate the requested HIGH threshold.
+
+## 12. Security regression
+
+| Required regression                            | Result                                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cross-user Drop/comment deletion and ownership | COVERED by real-DB integration tests                                                                                                                    |
+| Draft/private/block leakage                    | COVERED for discovery/direct API paths by real-DB integration tests                                                                                     |
+| Private Club bypass / Club role escalation     | COVERED in real-DB Club tests and policy tests                                                                                                          |
+| Chat outsider / media ownership                | COVERED in real-DB chat tests                                                                                                                           |
+| Consumer or forged role entering Admin         | COVERED in real-DB Admin tests and Admin policy tests                                                                                                   |
+| IDOR / injection                               | PARTIALLY COVERED through ownership tests and parameterized search injection regression                                                                 |
+| XSS / malicious upload                         | PARTIALLY COVERED by active-URL, Unicode-text, traversal, MIME-spoofing, EXIF stripping, and image-limit unit tests; no live upload stack/E2E execution |
+| CSRF where applicable                          | UNVERIFIED end to end                                                                                                                                   |
+| Session/token replay                           | UNVERIFIED end to end                                                                                                                                   |
+| Rate-limit abuse                               | UNVERIFIED in a deployed topology                                                                                                                       |
+
+**Security result: NOT ACCEPTED.** No executed test confirmed a CRITICAL defect, but missing E2E proof for explicitly mandatory controls is a HIGH release blocker. Absence of a finding is not proof of safety.
+
+## 13. Privacy
+
+**PARTIAL / NOT ACCEPTED.** Real-database tests passed for private profiles, drafts, blocking, muting, feed/search filtering, notification eligibility, private Club access, chat membership, and reporter confidentiality. Complete browser/API-boundary privacy journeys and production logging/error-tracking data minimization were not validated.
+
+## 14. Club / Global Trending isolation
+
+**PASS.** In addition to the committed 100-actor regression in the full integration suite, a one-off disposable-database run expanded the fixture to **10,000 CLUB_INTERNAL actors** and inserted 10,000 likes, 10,000 comments, 10,000 views, and 10,000 standard ReDrops. The computed Global Trending score remained zero. After one allowed `GLOBAL_PUBLIC` like, the score became positive. The temporary fixture expansion was reverted after the run; no production data was touched.
+
+## 15. Backup / restore
+
+**PASS for database mechanics; production recovery remains unverified.** `WYN_ENV=test DATABASE_URL=postgresql:///wyn_test pnpm readiness:backup-restore` created a custom-format backup, restored it into a newly created isolated database, and verified restored public tables. Media/object-storage recovery, production backup scheduling/retention, recovery point objective, recovery time objective, and a production-like restore drill were not validated.
+
+## 16. Production configuration
+
+Only presence and validity classifications are reported; no secret values were printed.
+
+| Requirement                                | Status  |
+| ------------------------------------------ | ------- |
+| Environment separation / `WYN_ENV`         | MISSING |
+| Production database URL and safeguards     | MISSING |
+| Consumer origin                            | MISSING |
+| Admin origin                               | MISSING |
+| API origin                                 | MISSING |
+| HTTPS/TLS origins                          | MISSING |
+| Session secret                             | MISSING |
+| Secure-cookie runtime verification         | MISSING |
+| CORS runtime configuration                 | MISSING |
+| Object-storage bucket                      | MISSING |
+| Object-storage region                      | MISSING |
+| CDN configuration                          | MISSING |
+| Email sender/provider                      | MISSING |
+| Push provider                              | MISSING |
+| Realtime configuration                     | MISSING |
+| Observability/error-tracking DSN           | MISSING |
+| Rate-limit backend/configuration           | MISSING |
+| Feature-flag runtime values                | MISSING |
+| Worker monitoring/alerting                 | MISSING |
+| Request/correlation-ID runtime propagation | MISSING |
+| Production log sink/redaction validation   | MISSING |
+| Admin production access/step-up controls   | MISSING |
+| Backup schedule/retention                  | MISSING |
+| Rollback procedure runtime validation      | MISSING |
+| Incident procedure exercise                | MISSING |
+
+`scripts/verify-production-env.mjs` failed closed for the missing required environment, HTTPS origins, session secret, storage, email, and observability settings. These statuses describe the isolated verification runner, not a claim that a separately managed production secret store lacks them.
+
+## 17. Blockers
 
 ### CRITICAL
 
-- None confirmed by executed tests. The security suite did not run, so absence of a confirmed CRITICAL finding is not evidence of safety.
+- None confirmed by executed tests.
 
 ### HIGH
 
-1. Required Step 15 global moderation-center implementation is explicitly absent from `main`.
-2. Required Step 16 delivery cannot be identified on `main` or a corresponding remote delivery branch.
-3. All mandatory release-validation gates after Git/PR inspection remain unexecuted; therefore the zero-HIGH security requirement, privacy isolation, trending isolation, migrations, builds, journeys, and recovery cannot be accepted.
-4. Production configuration and production-safety controls have not been validated in an approved secret-safe environment.
+1. Mandatory E2E coverage executed zero tests; all named Consumer and Admin journeys remain unaccepted in a running environment.
+2. Production configuration and runtime controls are unavailable/unvalidated, including secure cookies, CORS, TLS origins, rate limiting, monitoring, and production database safeguards.
+3. Complete CSRF, session/token replay, live malicious-upload, and deployed-topology authorization regression evidence is absent.
+4. Production-like media recovery and operational backup scheduling/retention/RPO/RTO evidence is absent.
 
 ### MEDIUM
 
-1. Open PR #23 is stale or unfinished and requires maintainer disposition.
-2. Multiple old remote branches are not ancestors of `main`; maintainers must confirm whether they are abandoned, superseded, or contain intentionally excluded work.
+1. Open PR #23 and older non-ancestor branches require maintainer disposition to confirm they contain no intentionally unmerged delivery.
+2. The dependency audit reports 7 moderate vulnerabilities.
+3. The trending integration fixture requires a superuser-capable disposable test role because it disables triggers to inject trusted projection inputs; documentation currently does not state this prerequisite.
 
 ### LOW
 
-- No additional low-severity issue was established during the stopped run.
+1. The dependency audit reports 2 low vulnerabilities.
+2. Next.js reports that its ESLint plugin is not detected.
+3. pnpm reports ignored dependency build scripts; the allowlist policy should be explicitly reviewed.
 
-## Known limitations
+## 18. Known limitations
 
-- GitHub PR inspection used the public GitHub API because GitHub CLI authentication was unavailable.
-- No production or staging secrets were requested, printed, or persisted.
-- This report records a stopped verification run; it is not a substitute for rerunning every gate after Steps 15 and 16 are merged.
+- Verification used a disposable local PostgreSQL 16 cluster, not staging or production.
+- GitHub PR state was read from the public API because GitHub CLI authentication was unavailable; no PR was changed.
+- The suite does not provide a running browser E2E environment.
+- Production secrets were neither requested nor inspected; values were never displayed.
+- Database backup/restore succeeded locally, but object-storage recovery and an operational restore drill remain outstanding.
+- No deployment action or production migration was performed.
 
 ## Required next actions
 
-1. Complete review and merge of approved Step 15 and Step 16 implementations through normal PR gates.
-2. Resolve or explicitly close/supersede PR #23; review non-merged remote branches without deleting them during this phase.
-3. Restart this final acceptance check from a clean, synchronized `main`.
-4. Execute every mandatory install, static, test, isolated PostgreSQL migration/integration, build, audit, security/privacy, trending, user/Admin journey, observability, backup/restore, configuration, and production-safety gate.
-5. Obtain Founder approval separately if and only if the rerun is fully acceptable. Do not deploy as part of verification.
+1. Provide and run a non-production deployed E2E environment covering every mandatory Consumer/Admin journey and adversarial boundary.
+2. Add or execute explicit CSRF, replay, rate-limit, live malicious-upload, and deployed authorization tests.
+3. Validate production configuration in the approved secret-safe environment, reporting only `CONFIGURED`, `MISSING`, or `INVALID`.
+4. Complete a production-like backup/restore drill including object storage and documented rollback/incident procedures.
+5. Disposition stale PR #23 and review old non-ancestor branches.
+6. Rerun this complete acceptance gate from clean synchronized `main`; Founder approval remains a separate subsequent decision.
+
+**FINAL RESULT: NOT READY FOR PRODUCTION**
