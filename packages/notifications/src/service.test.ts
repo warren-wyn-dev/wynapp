@@ -12,5 +12,6 @@ describe('notification contract', () => {
       'MENTIONS',
       'TRENDING',
       'SYSTEM',
+      'CHAT',
     ]));
 });

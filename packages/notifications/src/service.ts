@@ -14,6 +14,7 @@ export const categories = [
   'MENTIONS',
   'TRENDING',
   'SYSTEM',
+  'CHAT',
 ] as const;
 export type Category = (typeof categories)[number];
 const categoryFor = {
@@ -29,6 +30,7 @@ const categoryFor = {
   TrendingAchieved: 'TRENDING',
   Top100Achieved: 'TRENDING',
   SystemAnnouncementPublished: 'SYSTEM',
+  MessageCreated: 'CHAT',
 } as const;
 const typeFor = {
   DropLiked: 'DROP_LIKED',
@@ -43,6 +45,7 @@ const typeFor = {
   TrendingAchieved: 'TRENDING_ACHIEVED',
   Top100Achieved: 'TOP100_ACHIEVED',
   SystemAnnouncementPublished: 'SYSTEM_ANNOUNCEMENT',
+  MessageCreated: 'CHAT_MESSAGE',
 } as const;
 type EventType = keyof typeof typeFor;
 const payloadSchema = z
@@ -177,6 +180,7 @@ export class NotificationService {
   }
   private entity(type: EventType, aggregate: string) {
     if (type === 'SystemAnnouncementPublished') return 'SYSTEM';
+    if (type === 'MessageCreated') return 'CONVERSATION';
     if (
       type === 'UserFollowed' ||
       type === 'FollowRequested' ||
