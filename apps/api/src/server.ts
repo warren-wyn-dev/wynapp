@@ -16,6 +16,7 @@ const config = z
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().min(1).optional(),
+    DEV_EMAIL_LOG_PATH: z.string().min(1).optional(),
   })
   .parse(process.env);
 const database = createDatabase({
@@ -23,7 +24,8 @@ const database = createDatabase({
   environment: config.WYN_ENV,
 });
 const email: EmailAdapter = (() => {
-  if (config.WYN_ENV !== 'production') return new DevelopmentEmailAdapter();
+  if (config.WYN_ENV !== 'production')
+    return new DevelopmentEmailAdapter(config.DEV_EMAIL_LOG_PATH);
   // Fail at startup, not on the first user's registration request, if
   // production is misconfigured.
   if (!config.RESEND_API_KEY || !config.EMAIL_FROM)
