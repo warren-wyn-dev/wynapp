@@ -56,7 +56,7 @@ export class EngagementService {
     return tx(this.pool, async (c) => {
       await this.authorize(c, dropId, actor, true);
       const q = await c.query(
-        'INSERT INTO drop_likes(drop_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING 1',
+        "INSERT INTO drop_likes(drop_id,user_id,scope) VALUES($1,$2,'GLOBAL_PUBLIC') ON CONFLICT DO NOTHING RETURNING 1",
         [dropId, actor],
       );
       if (q.rowCount)
@@ -95,7 +95,7 @@ export class EngagementService {
           throw new EngagementError('INVALID_PARENT');
       }
       const q = await c.query(
-        'INSERT INTO comments(drop_id,author_user_id,parent_comment_id,body) VALUES($1,$2,$3,$4) RETURNING *',
+        "INSERT INTO comments(drop_id,author_user_id,parent_comment_id,body,scope) VALUES($1,$2,$3,$4,'GLOBAL_PUBLIC') RETURNING *",
         [dropId, actor, parent ?? null, text],
       );
       await this.event(
@@ -166,7 +166,7 @@ export class EngagementService {
     return tx(this.pool, async (c) => {
       await this.authorize(c, dropId, actor, true);
       const q = await c.query(
-        "INSERT INTO redrops(original_drop_id,author_user_id,kind) VALUES($1,$2,'STANDARD') ON CONFLICT DO NOTHING RETURNING *",
+        "INSERT INTO redrops(original_drop_id,author_user_id,kind,scope) VALUES($1,$2,'STANDARD','GLOBAL_PUBLIC') ON CONFLICT DO NOTHING RETURNING *",
         [dropId, actor],
       );
       if (q.rowCount)
@@ -197,7 +197,7 @@ export class EngagementService {
     return tx(this.pool, async (c) => {
       await this.authorize(c, dropId, actor, true);
       const q = await c.query(
-        "INSERT INTO redrops(original_drop_id,author_user_id,kind,quote_text) VALUES($1,$2,'QUOTE',$3) RETURNING *",
+        "INSERT INTO redrops(original_drop_id,author_user_id,kind,quote_text,scope) VALUES($1,$2,'QUOTE',$3,'GLOBAL_PUBLIC') RETURNING *",
         [dropId, actor, text],
       );
       await this.event(c, 'QuoteReDropCreated', dropId, actor, requestId, {
@@ -259,7 +259,7 @@ export class EngagementService {
     return tx(this.pool, async (c) => {
       await this.authorize(c, dropId, actor, true);
       const q = await c.query(
-        "INSERT INTO drop_views(drop_id,viewer_user_id,window_started_at) VALUES($1,$2,date_trunc('hour',now())) ON CONFLICT DO NOTHING RETURNING 1",
+        "INSERT INTO drop_views(drop_id,viewer_user_id,window_started_at,scope) VALUES($1,$2,date_trunc('hour',now()),'GLOBAL_PUBLIC') ON CONFLICT DO NOTHING RETURNING 1",
         [dropId, actor],
       );
       await c.query(

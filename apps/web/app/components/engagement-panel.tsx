@@ -19,9 +19,13 @@ type Comment = {
 export function EngagementPanel({
   dropId,
   initial,
+  countView = true,
+  compact = false,
 }: {
   dropId: string;
   initial: Counts;
+  countView?: boolean;
+  compact?: boolean;
 }) {
   const [counts, setCounts] = useState(initial),
     [comments, setComments] = useState<Comment[]>([]),
@@ -31,7 +35,9 @@ export function EngagementPanel({
   const csrf = () =>
     document.cookie
       .split('; ')
-      .find((v) => v.startsWith('wyn_csrf='))
+      .find(
+        (v) => v.startsWith('__Host-wyn_csrf=') || v.startsWith('wyn_csrf='),
+      )
       ?.split('=')[1] ?? '';
   async function mutate(path: string, method = 'POST', body?: object) {
     setBusy(path);
@@ -54,13 +60,14 @@ export function EngagementPanel({
     }
   }
   useEffect(() => {
-    fetch(`/v1/drops/${dropId}/comments`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((x) => setComments(x.data.items))
-      .catch(() => {});
-    void mutate(`/v1/drops/${dropId}/view`).catch(() => {}); // one counted view/hour; failures stay unobtrusive
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dropId]);
+    if (!compact) {
+      fetch(`/v1/drops/${dropId}/comments`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((x) => setComments(x.data.items))
+        .catch(() => {});
+    }
+    if (countView) void mutate(`/v1/drops/${dropId}/view`).catch(() => {});
+  }, [dropId, countView, compact]);
   async function toggleLike() {
     const before = counts;
     setCounts((c) => ({
@@ -89,15 +96,19 @@ export function EngagementPanel({
   }
   async function share() {
     try {
-      if (navigator.share) await navigator.share({ url: location.href });
+      const canShare = typeof navigator.share === 'function';
+      if (canShare) await navigator.share({ url: location.href });
       else await navigator.clipboard.writeText(location.href);
       await mutate(`/v1/drops/${dropId}/share`, 'POST', {
-        channel: navigator.share ? 'WEB_SHARE' : 'COPY_LINK',
+        channel: canShare ? 'WEB_SHARE' : 'COPY_LINK',
       });
     } catch {}
   }
   return (
-    <section className="engagement" aria-label="การมีส่วนร่วม">
+    <section
+      className={`engagement${compact ? ' engagement-compact' : ''}`}
+      aria-label="การมีส่วนร่วม"
+    >
       <div className="engagement-counts">
         <span>{counts.views_count} Views</span>
         <span>{counts.likes_count} Likes</span>
@@ -156,38 +167,42 @@ export function EngagementPanel({
           {error}
         </p>
       )}
-      <div className="comment-composer">
-        <label htmlFor="comment-composer">แสดงความคิดเห็น</label>
-        <textarea
-          id="comment-composer"
-          maxLength={2000}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <button
-          disabled={!!busy || !text.trim()}
-          onClick={() => void addComment()}
-        >
-          ส่ง
-        </button>
-      </div>
-      <div className="comment-list">
-        {comments.length === 0 ? (
-          <p className="muted">ยังไม่มีความคิดเห็น</p>
-        ) : (
-          comments.map((c) => (
-            <article
-              key={c.id}
-              className={c.parent_comment_id ? 'comment reply' : 'comment'}
-            >
-              <strong>
-                {c.display_name} <small>@{c.username}</small>
-              </strong>
-              <p>{c.deleted_at ? 'ความคิดเห็นนี้ถูกลบแล้ว' : c.body}</p>
-            </article>
-          ))
-        )}
-      </div>
+      {!compact && (
+        <div className="comment-composer">
+          <label htmlFor="comment-composer">แสดงความคิดเห็น</label>
+          <textarea
+            id="comment-composer"
+            maxLength={2000}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button
+            disabled={!!busy || !text.trim()}
+            onClick={() => void addComment()}
+          >
+            ส่ง
+          </button>
+        </div>
+      )}
+      {!compact && (
+        <div className="comment-list">
+          {comments.length === 0 ? (
+            <p className="muted">ยังไม่มีความคิดเห็น</p>
+          ) : (
+            comments.map((c) => (
+              <article
+                key={c.id}
+                className={c.parent_comment_id ? 'comment reply' : 'comment'}
+              >
+                <strong>
+                  {c.display_name} <small>@{c.username}</small>
+                </strong>
+                <p>{c.deleted_at ? 'ความคิดเห็นนี้ถูกลบแล้ว' : c.body}</p>
+              </article>
+            ))
+          )}
+        </div>
+      )}
     </section>
   );
 }

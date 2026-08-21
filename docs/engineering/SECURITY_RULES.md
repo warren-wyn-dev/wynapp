@@ -73,3 +73,9 @@ Drop author IDs are session-derived. Drafts and revisions are never public; publ
 ## Step 10 engagement
 
 Engagement commands re-authorize Drop visibility, bidirectional block, follow/private state, account state and deletion on every direct mutation and saved/comment read. Client-supplied actor IDs and counts are ignored; Save membership is never public, and ReDrop/Quote rendering must not cache or leak an inaccessible original.
+
+## Step 11 feed, search and ranking controls
+
+Feed, search and ranking candidates must pass authoritative account, Drop, visibility, bidirectional-block, viewer-mute and distribution-scope policy before serialization; a projection or cache never grants access. Search SQL is parameterized and bounded, and cursors are opaque/versioned and validated. Shared caches contain completed globally public snapshots only, never viewer-specific feed/search/suggestion responses.
+
+Global Trending and Top 100 consume only non-null server-assigned `GLOBAL_PUBLIC` facts. `CLUB_INTERNAL` facts and missing/unknown scopes are rejected from global aggregation. Distinct-actor signals, counted-view dedupe, caps/logarithms, self-action discounts and duplicate/burst penalties are required basic manipulation defenses. Private-search leakage or Club/global ranking contamination is CRITICAL and blocks release.
