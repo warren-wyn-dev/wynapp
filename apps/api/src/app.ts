@@ -709,7 +709,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       if (!req.auth) return;
       const p = changePasswordSchema.parse(req.body);
       const q = await pool.query(
-        'SELECT password_hash FROM user_credentials WHERE user_id=$1',
+        'SELECT c.password_hash,u.email_normalized FROM user_credentials c JOIN users u ON u.id=c.user_id WHERE c.user_id=$1',
         [req.auth.userId],
       );
       if (!(await verifyPassword(q.rows[0].password_hash, p.currentPassword)))
@@ -729,7 +729,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           method: 'authenticated',
         });
       });
-      await email.send({ to: 'redacted', template: 'PASSWORD_CHANGED' });
+      await email.send({
+        to: q.rows[0].email_normalized,
+        template: 'PASSWORD_CHANGED',
+      });
       return reply.send({ data: { changed: true }, request_id: req.requestId });
     },
   );
