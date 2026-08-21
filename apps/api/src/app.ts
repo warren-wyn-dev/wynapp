@@ -987,16 +987,14 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         })
         .parse(req.body);
       try {
-        return reply
-          .code(201)
-          .send({
-            data: await adminService.submitReport(
-              req.auth.userId,
-              p,
-              req.requestId,
-            ),
-            request_id: req.requestId,
-          });
+        return reply.code(201).send({
+          data: await adminService.submitReport(
+            req.auth.userId,
+            p,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
       } catch (e) {
         return adminFailure(e, reply, req.requestId);
       }
@@ -1017,16 +1015,14 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     { preHandler: [admin, adminCsrf] },
     async (req, reply) => {
       try {
-        return reply
-          .code(201)
-          .send({
-            data: await adminService.createCase(
-              req.admin!,
-              (req.params as { id: string }).id,
-              req.requestId,
-            ),
-            request_id: req.requestId,
-          });
+        return reply.code(201).send({
+          data: await adminService.createCase(
+            req.admin!,
+            (req.params as { id: string }).id,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
       } catch (e) {
         return adminFailure(e, reply, req.requestId);
       }
@@ -1054,17 +1050,15 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         })
         .parse(req.body);
       try {
-        return reply
-          .code(201)
-          .send({
-            data: await adminService.act(
-              req.admin!,
-              (req.params as { id: string }).id,
-              p,
-              req.requestId,
-            ),
-            request_id: req.requestId,
-          });
+        return reply.code(201).send({
+          data: await adminService.act(
+            req.admin!,
+            (req.params as { id: string }).id,
+            p,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
       } catch (e) {
         return adminFailure(e, reply, req.requestId);
       }

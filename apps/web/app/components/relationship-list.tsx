@@ -14,17 +14,24 @@ type RelationshipListProps = {
   action?: 'unblock' | 'unmute';
 };
 
-export function RelationshipList({ endpoint, empty, action }: RelationshipListProps) {
+export function RelationshipList({
+  endpoint,
+  empty,
+  action,
+}: RelationshipListProps) {
   const [items, setItems] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}${endpoint}`, {
-      credentials: 'include',
-      signal: controller.signal,
-    })
+    void fetch(
+      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}${endpoint}`,
+      {
+        credentials: 'include',
+        signal: controller.signal,
+      },
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error('load failed');
         const body = (await response.json()) as { data: { items: Person[] } };
@@ -42,7 +49,9 @@ export function RelationshipList({ endpoint, empty, action }: RelationshipListPr
   async function remove(person: Person) {
     if (!action) return;
     const previous = items;
-    setItems((current) => current.filter((item) => item.user_id !== person.user_id));
+    setItems((current) =>
+      current.filter((item) => item.user_id !== person.user_id),
+    );
     const token = document.cookie
       .split('; ')
       .find((cookie) => cookie.startsWith('__Host-wyn_csrf='))

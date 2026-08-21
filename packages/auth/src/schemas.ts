@@ -1,10 +1,36 @@
-import { z } from 'zod'; import { passwordSchema, usernameSchema } from './policy.js';
-export const registerSchema = z.strictObject({ email: z.email().max(320), password: passwordSchema, username: usernameSchema, displayName: z.string().trim().min(1).max(50) });
-export const loginSchema = z.strictObject({ email: z.email().max(320), password: z.string().min(1).max(128), deviceLabel: z.string().trim().max(100).optional() });
-export const tokenSchema = z.strictObject({ token: z.string().min(20).max(200) });
+import { z } from 'zod';
+import { passwordSchema, usernameSchema } from './policy.js';
+export const registerSchema = z.strictObject({
+  email: z.email().max(320),
+  password: passwordSchema,
+  username: usernameSchema,
+  displayName: z.string().trim().min(1).max(50),
+});
+export const loginSchema = z.strictObject({
+  email: z.email().max(320),
+  password: z.string().min(1).max(128),
+  deviceLabel: z.string().trim().max(100).optional(),
+});
+export const tokenSchema = z.strictObject({
+  token: z.string().min(20).max(200),
+});
 export const emailSchema = z.strictObject({ email: z.email().max(320) });
 export const resetSchema = tokenSchema.extend({ password: passwordSchema });
-export const changePasswordSchema = z.strictObject({ currentPassword: z.string().max(128), newPassword: passwordSchema });
-export const profileSchema = z.strictObject({ displayName: z.string().trim().min(1).max(50).optional(), bio: z.string().max(500).optional(), website: z.url().max(2048).nullable().optional(), location: z.string().trim().max(100).nullable().optional() }).refine(v => Object.keys(v).length > 0);
-export const privacySchema = z.strictObject({ accountVisibility: z.enum(['PUBLIC','PRIVATE']) });
-export const deleteSchema = z.strictObject({ currentPassword: z.string().max(128) });
+export const changePasswordSchema = z.strictObject({
+  currentPassword: z.string().max(128),
+  newPassword: passwordSchema,
+});
+export const profileSchema = z
+  .strictObject({
+    displayName: z.string().trim().min(1).max(50).optional(),
+    bio: z.string().max(500).optional(),
+    website: z.url().max(2048).nullable().optional(),
+    location: z.string().trim().max(100).nullable().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0);
+export const privacySchema = z.strictObject({
+  accountVisibility: z.enum(['PUBLIC', 'PRIVATE']),
+});
+export const deleteSchema = z.strictObject({
+  currentPassword: z.string().max(128),
+});

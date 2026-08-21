@@ -15,10 +15,15 @@ type CookieReply = {
   clearCookie(name: string, options: Pick<CookieOptions, 'path'>): unknown;
 };
 
-export function setConsumerCookies(reply: CookieReply, token: string, csrf: string): void {
+export function setConsumerCookies(
+  reply: CookieReply,
+  token: string,
+  csrf: string,
+): void {
   const common = {
     path: '/',
-    secure: process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test',
+    secure:
+      process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test',
     sameSite: 'lax' as const,
     maxAge: SESSION_MAX_AGE_SECONDS,
   };
