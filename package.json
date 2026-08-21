@@ -12,8 +12,8 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
-    "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "test:integration": "vitest run '**/*.integration.test.ts' --passWithNoTests",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -32,7 +32,8 @@
     "typescript": "5.7.2",
     "typescript-eslint": "8.18.1",
     "vitest": "4.1.11",
-    "vite": "7.3.5"
+    "vite": "7.3.5",
+    "@types/pg": "8.23.1"
   },
   "pnpm": {
     "overrides": {
@@ -40,5 +41,8 @@
       "sharp": "0.35.0",
       "postcss": "8.5.18"
     }
+  },
+  "dependencies": {
+    "pg": "8.23.0"
   }
 }

@@ -21,9 +21,15 @@
     "@wyn/validation": "workspace:*",
     "fastify": "5.8.5",
     "fastify-plugin": "5.0.1",
-    "zod": "3.24.1"
+    "zod": "4.4.3",
+    "@fastify/cookie": "11.1.2",
+    "@fastify/rate-limit": "11.2.0",
+    "@wyn/database": "workspace:*",
+    "argon2": "0.44.0",
+    "pg": "8.23.0"
   },
   "devDependencies": {
-    "tsx": "4.19.2"
+    "tsx": "4.19.2",
+    "@types/pg": "8.23.1"
   }
 }

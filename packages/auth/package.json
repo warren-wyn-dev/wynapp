@@ -15,6 +15,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run src --passWithNoTests"
   },
-  "dependencies": {},
+  "dependencies": {
+    "argon2": "0.44.0",
+    "zod": "4.4.3"
+  },
   "devDependencies": {}
 }
