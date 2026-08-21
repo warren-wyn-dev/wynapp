@@ -65,3 +65,7 @@ Every finding records affected scope, prerequisites, reproduction, evidence, imp
 ## Step 8 media boundary
 
 Uploaded images remain private quarantine data until strict decode, bounded dimensions/pixels, metadata stripping and deterministic re-encoding complete. Storage keys and signed requests are server-generated; provider credentials never enter browser code. Media reads, completion, deletion and attachment are owner-authorized and no global media enumeration endpoint is permitted. See `docs/features/media/SECURITY.md`.
+
+## Step 9 Drop boundary
+
+Drop author IDs are session-derived. Drafts and revisions are never public; published reads recheck blocks, follows, account privacy, state, and soft deletion. Attachments are transactionally restricted to nine READY, author-owned DROP_IMAGE assets. External links permit only HTTP(S), and user text is plain text rather than HTML.
