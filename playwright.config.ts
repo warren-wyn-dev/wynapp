@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 import {
   API_ORIGIN,
   API_PORT,
+  MOCK_S3_PORT,
+  OBJECT_STORAGE_ENV,
   TEST_DATABASE_URL,
   WEB_ORIGIN,
   WEB_PORT,
@@ -47,6 +49,7 @@ export default defineConfig({
         // a suite that scripts many accounts' logins back to back; this
         // override only takes effect outside production (see server.ts).
         AUTH_RATE_LIMIT_MAX: '1000',
+        ...OBJECT_STORAGE_ENV,
       },
     },
     {
@@ -71,7 +74,19 @@ export default defineConfig({
         DATABASE_URL: TEST_DATABASE_URL,
         WORKER_HEALTH_PORT: String(WORKER_HEALTH_PORT),
         WORKER_POLL_INTERVAL_MS: '250',
+        ...OBJECT_STORAGE_ENV,
       },
+    },
+    {
+      // A minimal in-memory S3-compatible test double (see
+      // tests/e2e/mock-s3-server.ts) so the media upload/processing E2E
+      // coverage exercises the real S3MediaStorage/AWS SDK code path
+      // without needing real cloud credentials.
+      command: `pnpm exec tsx tests/e2e/mock-s3-server.ts`,
+      url: `${OBJECT_STORAGE_ENV.OBJECT_STORAGE_ENDPOINT}/health`,
+      reuseExistingServer: reuse,
+      timeout: 15000,
+      env: { MOCK_S3_PORT: String(MOCK_S3_PORT) },
     },
   ],
 });

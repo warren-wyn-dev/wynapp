@@ -200,16 +200,22 @@ export class MediaService {
   }
   async attachProfile(owner: string, id: string, kind: 'avatar' | 'cover') {
     const purpose = kind === 'avatar' ? 'PROFILE_AVATAR' : 'PROFILE_COVER',
-      column = kind === 'avatar' ? 'avatar_media_id' : 'cover_media_id';
+      idColumn = kind === 'avatar' ? 'avatar_media_id' : 'cover_media_id',
+      urlColumn = kind === 'avatar' ? 'avatar_url' : 'cover_url';
     await this.tx(async (c) => {
       const q = await c.query(
-        "SELECT id FROM media_assets WHERE id=$1 AND owner_user_id=$2 AND purpose=$3 AND status='READY' FOR UPDATE",
+        "SELECT feed_variant_key FROM media_assets WHERE id=$1 AND owner_user_id=$2 AND purpose=$3 AND status='READY' FOR UPDATE",
         [id, owner, purpose],
       );
       if (!q.rowCount) throw new MediaError('NOT_FOUND');
+      // profiles.avatar_url/cover_url (not avatar_media_id/cover_media_id)
+      // is what every read path actually serves — GET /v1/me, GET
+      // /v1/users/:username, etc. — so this has to be kept in sync here,
+      // not just the media reference, or the picture never shows up
+      // anywhere despite processing successfully.
       await c.query(
-        `UPDATE profiles SET ${column}=$1,updated_at=now() WHERE user_id=$2`,
-        [id, owner],
+        `UPDATE profiles SET ${idColumn}=$1,${urlColumn}=$2,updated_at=now() WHERE user_id=$3`,
+        [id, this.storage.publicUrl(q.rows[0].feed_variant_key), owner],
       );
     });
   }
@@ -247,5 +253,60 @@ export class MediaService {
 export class MediaError extends Error {
   constructor(readonly code: string) {
     super(code);
+  }
+}
+/**
+ * Turns a MediaProcessingRequested outbox event into an actual call to
+ * MediaService.process (variant generation via sharp + storage writes),
+ * using the same claim-lease/retry/dead-letter mechanics as
+ * NotificationWorker in apps/worker. Nothing previously consumed this
+ * event at all, so uploaded media stayed at status UPLOADED forever.
+ */
+export class MediaWorker {
+  constructor(
+    private readonly pool: Pool,
+    private readonly service: MediaService,
+  ) {}
+  async dispatch(): Promise<number> {
+    const q = await this.pool.query(
+      `WITH pending AS (SELECT id FROM outbox_events WHERE dispatched_at IS NULL AND event_type='MediaProcessingRequested' ORDER BY occurred_at LIMIT 100 FOR UPDATE SKIP LOCKED), deliveries AS (INSERT INTO outbox_deliveries(event_id,consumer) SELECT id,'media' FROM pending ON CONFLICT DO NOTHING) UPDATE outbox_events SET dispatched_at=now() WHERE id IN(SELECT id FROM pending) RETURNING id`,
+    );
+    return q.rowCount ?? 0;
+  }
+  async runOnce(): Promise<'IDLE' | 'PROCESSED' | 'RETRY' | 'DEAD_LETTER'> {
+    const claimed = await this.pool.query(
+      `UPDATE outbox_deliveries SET locked_until=now()+interval '30 seconds' WHERE (event_id,consumer)=(SELECT event_id,consumer FROM outbox_deliveries WHERE consumer='media' AND delivered_at IS NULL AND dead_lettered_at IS NULL AND available_at<=now() AND (locked_until IS NULL OR locked_until<now()) ORDER BY available_at,event_id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING event_id,attempt_count`,
+    );
+    if (!claimed.rowCount) return 'IDLE';
+    const row = claimed.rows[0] as { event_id: string; attempt_count: number };
+    try {
+      const event = await this.pool.query(
+        'SELECT aggregate_id,request_id FROM outbox_events WHERE id=$1',
+        [row.event_id],
+      );
+      if (!event.rowCount) throw new MediaError('EVENT_NOT_FOUND');
+      await this.service.process(
+        event.rows[0].aggregate_id as string,
+        event.rows[0].request_id as string,
+      );
+      await this.pool.query(
+        "UPDATE outbox_deliveries SET delivered_at=now(),locked_until=NULL WHERE event_id=$1 AND consumer='media'",
+        [row.event_id],
+      );
+      return 'PROCESSED';
+    } catch (error) {
+      const attempts = row.attempt_count + 1,
+        dead = attempts >= 5;
+      await this.pool.query(
+        `UPDATE outbox_deliveries SET attempt_count=$2::integer,locked_until=NULL,last_error_code=$3,available_at=now()+make_interval(secs=>LEAST(300,power(2,$2::integer)::int)),dead_lettered_at=CASE WHEN $4 THEN now() END WHERE event_id=$1 AND consumer='media'`,
+        [
+          row.event_id,
+          attempts,
+          error instanceof Error ? error.name : 'UNKNOWN',
+          dead,
+        ],
+      );
+      return dead ? 'DEAD_LETTER' : 'RETRY';
+    }
   }
 }

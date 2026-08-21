@@ -3,8 +3,8 @@ import {
   HeadObjectCommand,
   PutObjectCommand,
   DeleteObjectCommand,
+  S3Client,
 } from '@aws-sdk/client-s3';
-import type { S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 export type ObjectMetadata = {
   bytes: number;
@@ -110,4 +110,44 @@ export function assertKey(key: string) {
     key.includes('..')
   )
     throw new Error('INVALID_STORAGE_KEY');
+}
+/**
+ * Shared by apps/api (signs uploads, serves media) and apps/worker
+ * (processes uploads into variants) so the object-storage env contract
+ * lives in one place. Returns undefined when storage isn't configured,
+ * matching today's behavior of media routes responding 503 rather than
+ * failing hard.
+ */
+export function createS3MediaStorageFromEnv(
+  env: NodeJS.ProcessEnv,
+): MediaStorage | undefined {
+  const region = env.OBJECT_STORAGE_REGION;
+  const quarantineBucket = env.OBJECT_STORAGE_QUARANTINE_BUCKET;
+  const processedBucket = env.OBJECT_STORAGE_BUCKET;
+  const cdnOrigin = env.OBJECT_STORAGE_CDN_ORIGIN;
+  if (!region || !quarantineBucket || !processedBucket || !cdnOrigin)
+    return undefined;
+  const client = new S3Client({
+    region,
+    ...(env.OBJECT_STORAGE_ENDPOINT
+      ? { endpoint: env.OBJECT_STORAGE_ENDPOINT }
+      : {}),
+    ...(env.OBJECT_STORAGE_FORCE_PATH_STYLE === 'true'
+      ? { forcePathStyle: true }
+      : {}),
+    ...(env.OBJECT_STORAGE_ACCESS_KEY_ID && env.OBJECT_STORAGE_SECRET_ACCESS_KEY
+      ? {
+          credentials: {
+            accessKeyId: env.OBJECT_STORAGE_ACCESS_KEY_ID,
+            secretAccessKey: env.OBJECT_STORAGE_SECRET_ACCESS_KEY,
+          },
+        }
+      : {}),
+  });
+  return new S3MediaStorage(
+    client,
+    quarantineBucket,
+    processedBucket,
+    cdnOrigin,
+  );
 }

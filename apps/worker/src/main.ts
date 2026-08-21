@@ -1,5 +1,10 @@
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
+import {
+  MediaService,
+  MediaWorker,
+  createS3MediaStorageFromEnv,
+} from '@wyn/media';
 import pg from 'pg';
 import { z } from 'zod';
 import { NotificationWorker, workerLogger } from './worker.js';
@@ -15,6 +20,15 @@ const config = z
 
 const pool = new pg.Pool({ connectionString: config.DATABASE_URL });
 const notificationWorker = new NotificationWorker(pool);
+const storage = createS3MediaStorageFromEnv(process.env);
+const mediaWorker = storage
+  ? new MediaWorker(pool, new MediaService(pool, storage))
+  : undefined;
+if (!mediaWorker)
+  workerLogger.warn(
+    {},
+    'OBJECT_STORAGE_* is not configured; media processing is disabled',
+  );
 
 const health = createServer((_req, res) => {
   res.writeHead(200, { 'content-type': 'application/json' });
@@ -30,25 +44,42 @@ function stop(signal: string) {
 process.once('SIGINT', () => stop('SIGINT'));
 process.once('SIGTERM', () => stop('SIGTERM'));
 
-workerLogger.info({ workerId: config.WORKER_ID }, 'worker starting');
-// Moves newly-written outbox_events into the notifications delivery queue,
+// Moves newly-written outbox_events into each consumer's delivery queue,
 // then repeatedly claims and processes one at a time (short leases, up to
-// five attempts before dead-lettering — see NotificationWorker.runOnce).
-// This loop is the thing that actually turns "someone liked your Drop"
-// into a row in `notifications`; previously nothing in the deployable
-// apps/worker process called it at all.
-while (!stopping) {
-  try {
-    await notificationWorker.dispatch();
-    const result = await notificationWorker.runOnce();
-    if (result === 'IDLE') await delay(config.WORKER_POLL_INTERVAL_MS);
-  } catch (error) {
-    // A single bad claim/dispatch attempt (e.g. a transient connection
-    // error, or the schema not being ready yet during a deploy/migration)
-    // must not take the whole process down — back off and keep polling.
-    workerLogger.error({ err: error }, 'dispatch loop iteration failed');
-    await delay(config.WORKER_POLL_INTERVAL_MS);
+// five attempts before dead-lettering — see [Notification|Media]Worker's
+// runOnce). These loops are what actually turn "someone liked your Drop"
+// into a `notifications` row, and an uploaded image into ready variants;
+// previously nothing in the deployable apps/worker process called either.
+async function loop(name: string, step: () => Promise<string>): Promise<void> {
+  while (!stopping) {
+    try {
+      const result = await step();
+      if (result === 'IDLE') await delay(config.WORKER_POLL_INTERVAL_MS);
+    } catch (error) {
+      // A single bad claim/dispatch attempt (e.g. a transient connection
+      // error, or the schema not being ready yet during a deploy/migration)
+      // must not take the whole process down — back off and keep polling.
+      workerLogger.error(
+        { err: error, consumer: name },
+        'dispatch loop iteration failed',
+      );
+      await delay(config.WORKER_POLL_INTERVAL_MS);
+    }
   }
 }
+
+workerLogger.info({ workerId: config.WORKER_ID }, 'worker starting');
+await Promise.all([
+  loop('notifications', async () => {
+    await notificationWorker.dispatch();
+    return notificationWorker.runOnce();
+  }),
+  mediaWorker
+    ? loop('media', async () => {
+        await mediaWorker.dispatch();
+        return mediaWorker.runOnce();
+      })
+    : Promise.resolve(),
+]);
 health.close();
 await pool.end();
