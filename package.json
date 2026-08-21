@@ -1,0 +1,44 @@
+{
+  "name": "wyn",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "vitest run '**/*.integration.test.ts' --passWithNoTests",
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit": "pnpm audit --audit-level high"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@playwright/test": "1.57.0",
+    "@types/node": "22.12.0",
+    "eslint": "9.39.1",
+    "eslint-config-next": "15.5.21",
+    "eslint-plugin-react-hooks": "5.1.0",
+    "globals": "15.14.0",
+    "prettier": "3.4.2",
+    "turbo": "2.3.3",
+    "typescript": "5.7.2",
+    "typescript-eslint": "8.18.1",
+    "vitest": "4.1.11",
+    "vite": "7.3.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "7.3.5",
+      "sharp": "0.35.0",
+      "postcss": "8.5.18"
+    }
+  }
+}

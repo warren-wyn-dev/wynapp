@@ -1,2 +1,13 @@
 __pycache__/
 *.py[cod]
+.next/
+node_modules/
+.turbo/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
