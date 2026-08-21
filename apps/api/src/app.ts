@@ -63,6 +63,7 @@ import {
 } from '../../../packages/notifications/src/index.js';
 import { ClubError, ClubService } from '../../../packages/clubs/src/index.js';
 import { ChatError, ChatService } from '../../../packages/chat/src/index.js';
+import { AdminError, AdminService } from '../../../packages/admin/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -191,6 +192,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   const notifications = new NotificationService(pool);
   const clubs = new ClubService(pool);
   const chat = new ChatService(pool);
+  const adminService = new AdminService(pool);
   const engageLimited = {
     config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
   };
@@ -366,6 +368,94 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         'Request authenticity could not be verified.',
         req.requestId,
       );
+  }
+  async function admin(req: FastifyRequest, reply: FastifyReply) {
+    const raw = req.cookies[ADMIN_COOKIE];
+    if (!raw)
+      return fail(
+        reply,
+        401,
+        'ADMIN_UNAUTHENTICATED',
+        'Admin authentication is required.',
+        req.requestId,
+      );
+    const q = await pool.query(
+      "SELECT s.id,s.user_id,s.step_up_at,a.role,a.permissions FROM sessions s JOIN admin_principals a ON a.user_id=s.user_id WHERE s.token_hash=$1 AND s.realm='ADMIN' AND s.audience='wyn-admin' AND a.enabled AND a.role IS NOT NULL AND s.revoked_at IS NULL AND s.expires_at>now()",
+      [hashToken(raw)],
+    );
+    if (!q.rowCount)
+      return fail(
+        reply,
+        401,
+        'ADMIN_UNAUTHENTICATED',
+        'Admin authentication is required.',
+        req.requestId,
+      );
+    const r = q.rows[0];
+    req.admin = {
+      userId: r.user_id,
+      sessionId: r.id,
+      role: r.role,
+      grants: r.permissions,
+      stepUpAt: r.step_up_at,
+    };
+  }
+  async function adminCsrf(req: FastifyRequest, reply: FastifyReply) {
+    if (!req.admin) return;
+    const token = req.headers['x-admin-csrf-token'];
+    if (
+      req.headers.origin !==
+        (process.env.ADMIN_ORIGIN ?? 'http://localhost:3001') ||
+      typeof token !== 'string'
+    )
+      return fail(
+        reply,
+        403,
+        'CSRF_INVALID',
+        'Request authenticity could not be verified.',
+        req.requestId,
+      );
+    const q = await pool.query(
+      'SELECT 1 FROM sessions WHERE id=$1 AND csrf_token_hash=$2',
+      [req.admin.sessionId, hashToken(token)],
+    );
+    if (!q.rowCount)
+      return fail(
+        reply,
+        403,
+        'CSRF_INVALID',
+        'Request authenticity could not be verified.',
+        req.requestId,
+      );
+  }
+  function adminFailure(
+    error: unknown,
+    reply: FastifyReply,
+    requestId: string,
+  ) {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The admin request is invalid.',
+        requestId,
+      );
+    if (error instanceof AdminError)
+      return fail(
+        reply,
+        error.code === 'UNAUTHENTICATED'
+          ? 401
+          : error.code === 'FORBIDDEN' || error.code === 'STEP_UP_REQUIRED'
+            ? 403
+            : error.code === 'NOT_FOUND' || error.code === 'INVALID_TARGET'
+              ? 404
+              : 409,
+        error.code,
+        'The admin operation is unavailable.',
+        requestId,
+      );
+    throw error;
   }
 
   app.post('/v1/auth/register', { ...limited }, async (req, reply) => {
@@ -811,33 +901,175 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       });
     },
   );
-  app.get('/admin/v1/session', async (req, reply) => {
-    const raw = req.cookies[ADMIN_COOKIE];
-    if (!raw)
-      return fail(
-        reply,
-        401,
-        'ADMIN_UNAUTHENTICATED',
-        'Admin authentication is required.',
-        req.requestId,
-      );
+  app.post('/admin/v1/auth/login', { ...limited }, async (req, reply) => {
+    const p = loginSchema.parse(req.body);
     const q = await pool.query(
-      "SELECT 1 FROM sessions s JOIN admin_principals a ON a.user_id=s.user_id WHERE s.token_hash=$1 AND s.realm='ADMIN' AND s.audience='wyn-admin' AND a.enabled AND s.revoked_at IS NULL AND s.expires_at>now()",
-      [hashToken(raw)],
+      'SELECT u.id,u.account_state,c.password_hash FROM users u JOIN user_credentials c ON c.user_id=u.id JOIN admin_principals a ON a.user_id=u.id WHERE u.email_normalized=$1 AND a.enabled AND a.role IS NOT NULL',
+      [normalizeEmail(p.email)],
     );
-    if (!q.rowCount)
-      return fail(
-        reply,
-        401,
-        'ADMIN_UNAUTHENTICATED',
-        'Admin authentication is required.',
-        req.requestId,
-      );
+    const u = q.rows[0];
+    if (
+      !u ||
+      !mayAuthenticate(u.account_state) ||
+      !(await verifyPassword(u.password_hash, p.password))
+    )
+      return reply
+        .code(401)
+        .send({ error: { ...genericAuth, request_id: req.requestId } });
+    const token = issueToken(),
+      csrfToken = issueToken();
+    await pool.query(
+      "INSERT INTO sessions(user_id,token_hash,realm,audience,csrf_token_hash,label,expires_at) VALUES($1,$2,'ADMIN','wyn-admin',$3,$4,now()+interval '8 hours')",
+      [u.id, token.hash, csrfToken.hash, p.deviceLabel ?? null],
+    );
+    reply.setCookie(ADMIN_COOKIE, token.raw, {
+      path: '/',
+      httpOnly: true,
+      secure:
+        process.env.NODE_ENV !== 'test' &&
+        process.env.NODE_ENV !== 'development',
+      sameSite: 'lax',
+      maxAge: 28800,
+    });
     return reply.send({
-      data: { authenticated: true },
+      data: { authenticated: true, csrf_token: csrfToken.raw },
       request_id: req.requestId,
     });
   });
+  app.post(
+    '/admin/v1/auth/step-up',
+    { preHandler: [admin, adminCsrf] },
+    async (req, reply) => {
+      if (!req.admin) return;
+      const p = z
+        .strictObject({ password: z.string().min(1).max(128) })
+        .parse(req.body);
+      const q = await pool.query(
+        'SELECT password_hash FROM user_credentials WHERE user_id=$1',
+        [req.admin.userId],
+      );
+      if (
+        !q.rowCount ||
+        !(await verifyPassword(q.rows[0].password_hash, p.password))
+      )
+        return fail(
+          reply,
+          401,
+          'INVALID_CREDENTIALS',
+          'Credentials are invalid.',
+          req.requestId,
+        );
+      await pool.query('UPDATE sessions SET step_up_at=now() WHERE id=$1', [
+        req.admin.sessionId,
+      ]);
+      return reply.send({ data: { step_up: true }, request_id: req.requestId });
+    },
+  );
+  app.get('/admin/v1/session', { preHandler: [admin] }, async (req, reply) =>
+    reply.send({
+      data: { authenticated: true, role: req.admin!.role },
+      request_id: req.requestId,
+    }),
+  );
+  app.post(
+    '/v1/reports',
+    { preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      const p = z
+        .strictObject({
+          targetType: z.enum(['USER', 'DROP', 'COMMENT', 'CLUB', 'MESSAGE']),
+          targetId: z.uuid(),
+          reasonCode: z.string().regex(/^[A-Z0-9_]{2,50}$/),
+          context: z.string().max(2000).optional(),
+          sourceSurface: z.string().min(1).max(50),
+          idempotencyKey: z.string().min(8).max(100),
+        })
+        .parse(req.body);
+      try {
+        return reply
+          .code(201)
+          .send({
+            data: await adminService.submitReport(
+              req.auth.userId,
+              p,
+              req.requestId,
+            ),
+            request_id: req.requestId,
+          });
+      } catch (e) {
+        return adminFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.get('/admin/v1/reports', { preHandler: [admin] }, async (req, reply) => {
+    try {
+      return reply.send({
+        data: await adminService.listReports(req.admin!),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return adminFailure(e, reply, req.requestId);
+    }
+  });
+  app.post(
+    '/admin/v1/reports/:id/case',
+    { preHandler: [admin, adminCsrf] },
+    async (req, reply) => {
+      try {
+        return reply
+          .code(201)
+          .send({
+            data: await adminService.createCase(
+              req.admin!,
+              (req.params as { id: string }).id,
+              req.requestId,
+            ),
+            request_id: req.requestId,
+          });
+      } catch (e) {
+        return adminFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.post(
+    '/admin/v1/cases/:id/actions',
+    { preHandler: [admin, adminCsrf] },
+    async (req, reply) => {
+      const p = z
+        .strictObject({
+          actionType: z.enum([
+            'NO_ACTION',
+            'WARNING',
+            'REMOVE_CONTENT',
+            'RESTRICT',
+            'SUSPEND',
+            'BAN',
+          ]),
+          reasonCode: z.string().min(2).max(50),
+          notes: z.string().max(2000).optional(),
+          effectiveUntil: z.coerce.date().optional(),
+          idempotencyKey: z.string().min(8).max(100),
+          expectedVersion: z.number().int().positive(),
+        })
+        .parse(req.body);
+      try {
+        return reply
+          .code(201)
+          .send({
+            data: await adminService.act(
+              req.admin!,
+              (req.params as { id: string }).id,
+              p,
+              req.requestId,
+            ),
+            request_id: req.requestId,
+          });
+      } catch (e) {
+        return adminFailure(e, reply, req.requestId);
+      }
+    },
+  );
   app.post(
     '/v1/users/:username/follow',
     { ...socialLimited, preHandler: [consumer, csrf] },
@@ -2257,16 +2489,14 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   );
   app.post('/v1/conversations', chatWrite, async (req, reply) => {
     try {
-      return reply
-        .code(201)
-        .send({
-          data: await chat.create(
-            req.auth!.userId,
-            z.object({ targetUserId: z.uuid() }).parse(req.body).targetUserId,
-            req.requestId,
-          ),
-          request_id: req.requestId,
-        });
+      return reply.code(201).send({
+        data: await chat.create(
+          req.auth!.userId,
+          z.object({ targetUserId: z.uuid() }).parse(req.body).targetUserId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
     } catch (e) {
       return chatFailure(e, reply, req.requestId);
     }
@@ -2315,17 +2545,15 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   });
   app.post('/v1/conversations/:id/messages', chatWrite, async (req, reply) => {
     try {
-      return reply
-        .code(201)
-        .send({
-          data: await chat.send(
-            uuid.parse((req.params as { id: string }).id),
-            req.auth!.userId,
-            req.body,
-            req.requestId,
-          ),
-          request_id: req.requestId,
-        });
+      return reply.code(201).send({
+        data: await chat.send(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth!.userId,
+          req.body,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
     } catch (e) {
       return chatFailure(e, reply, req.requestId);
     }

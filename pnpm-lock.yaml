@@ -112,6 +112,9 @@ importers:
       '@fastify/rate-limit':
         specifier: 11.2.0
         version: 11.2.0
+      '@wyn/admin-core':
+        specifier: workspace:*
+        version: link:../../packages/admin
       '@wyn/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -220,6 +223,19 @@ importers:
       tsx:
         specifier: 4.19.2
         version: 4.19.2
+
+  packages/admin:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
 
   packages/auth:
     dependencies:
