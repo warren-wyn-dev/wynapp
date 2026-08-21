@@ -57,6 +57,10 @@ import {
   DiscoveryError,
   DiscoveryService,
 } from '../../../packages/discovery/src/index.js';
+import {
+  NotificationError,
+  NotificationService,
+} from '../../../packages/notifications/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -182,6 +186,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   const drops = new DropService(pool);
   const engagement = new EngagementService(pool);
   const discovery = new DiscoveryService(pool);
+  const notifications = new NotificationService(pool);
   const engageLimited = {
     config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
   };
@@ -1870,6 +1875,160 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         },
         request_id: req.requestId,
       });
+    },
+  );
+  const notificationRead = {
+    preHandler: [consumer],
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+  };
+  const notificationWrite = {
+    preHandler: [consumer, csrf],
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+  };
+  const notificationFailure = (
+    error: unknown,
+    reply: FastifyReply,
+    requestId: string,
+  ) => {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The notification request is invalid.',
+        requestId,
+      );
+    if (error instanceof NotificationError)
+      return fail(
+        reply,
+        error.code === 'NOT_FOUND'
+          ? 404
+          : error.code === 'INVALID_CURSOR'
+            ? 400
+            : 409,
+        error.code,
+        'The notification operation is unavailable.',
+        requestId,
+      );
+    throw error;
+  };
+  app.get('/v1/notifications', notificationRead, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = z
+        .object({
+          cursor: z.string().max(500).optional(),
+          limit: z.coerce.number().int().min(1).max(50).default(30),
+        })
+        .parse(req.query);
+      return reply.send({
+        data: await notifications.list(req.auth.userId, q.cursor, q.limit),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return notificationFailure(e, reply, req.requestId);
+    }
+  });
+  app.get(
+    '/v1/notifications/unread-count',
+    notificationRead,
+    async (req, reply) => {
+      if (!req.auth) return;
+      return reply.send({
+        data: { count: await notifications.unread(req.auth.userId) },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.post(
+    '/v1/notifications/:id/read',
+    notificationWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        await notifications.read(
+          req.auth.userId,
+          uuid.parse((req.params as { id: string }).id),
+        );
+        return reply.code(204).send();
+      } catch (e) {
+        return notificationFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.post(
+    '/v1/notifications/read-all',
+    notificationWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      return reply.send({
+        data: { updated: await notifications.readAll(req.auth.userId) },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.get(
+    '/v1/me/notification-preferences',
+    notificationRead,
+    async (req, reply) => {
+      if (!req.auth) return;
+      return reply.send({
+        data: { items: await notifications.preferences(req.auth.userId) },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.patch(
+    '/v1/me/notification-preferences',
+    notificationWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.send({
+          data: {
+            items: await notifications.setPreferences(
+              req.auth.userId,
+              req.body,
+            ),
+          },
+          request_id: req.requestId,
+        });
+      } catch (e) {
+        return notificationFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.post(
+    '/v1/me/push-subscriptions',
+    notificationWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply
+          .code(201)
+          .send({
+            data: await notifications.subscribe(req.auth.userId, req.body),
+            request_id: req.requestId,
+          });
+      } catch (e) {
+        return notificationFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.delete(
+    '/v1/me/push-subscriptions/:id',
+    notificationWrite,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        await notifications.unsubscribe(
+          req.auth.userId,
+          uuid.parse((req.params as { id: string }).id),
+        );
+        return reply.code(204).send();
+      } catch (e) {
+        return notificationFailure(e, reply, req.requestId);
+      }
     },
   );
   return app;

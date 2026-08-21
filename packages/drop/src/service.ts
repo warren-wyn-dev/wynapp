@@ -82,6 +82,8 @@ export class DropService {
         1,
         requestId,
       );
+      if (status === 'PUBLISHED')
+        await this.mentionEvents(c, id, userId, requestId);
       if (idempotencyKey)
         await c.query(
           'INSERT INTO drop_idempotency(user_id,action,idempotency_key,request_hash,drop_id) VALUES($1,$2,$3,$4,$5)',
@@ -89,6 +91,19 @@ export class DropService {
         );
       return this.load(c, id, userId, true);
     });
+  }
+  private async mentionEvents(
+    c: PoolClient,
+    id: string,
+    actor: string,
+    requestId: string,
+  ) {
+    await c.query(
+      `INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id)
+      SELECT 'UserMentioned','Drop',$1,jsonb_build_object('actor_user_id',$2::text,'mention_target_user_id',mentioned_user_id::text),$3
+      FROM drop_mentions WHERE drop_id=$1 AND mentioned_user_id<>$2`,
+      [id, actor, requestId],
+    );
   }
   async listDrafts(userId: string) {
     const q = await this.pool.query(

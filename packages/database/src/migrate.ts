@@ -22,6 +22,7 @@ export async function migrate(url: string): Promise<void> {
       '0004_step9_drop_core.sql',
       '0005_step10_engagement.sql',
       '0006_step11_feed_discovery.sql',
+      '0007_step12_notifications.sql',
     ]) {
       const path = fileURLToPath(
         new URL(`../migrations/${name}`, import.meta.url),

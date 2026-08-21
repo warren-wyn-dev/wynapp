@@ -1,0 +1,3 @@
+# Deduplication and Cooldowns
+
+A SHA-256 key is derived server-side from recipient, mapped notification type, actor, entity, comment, and (for ranking only) ranking window. Unique `(recipient_user_id,dedupe_key)` makes duplicate events, retries, redelivery, and engagement replay harmless. Like churn in the same actor/entity combination does not create repeated inbox rows. Trending uses a seven-day policy window and Top 100 a thirty-day policy window; ranking producers provide their authoritative window, so recomputes in the same window dedupe. A later approved threshold policy may change these windows.

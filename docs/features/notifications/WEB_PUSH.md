@@ -1,0 +1,3 @@
+# Web Push Foundation
+
+Authenticated, CSRF-protected subscribe/unsubscribe endpoints store a bounded endpoint and Web Push key material per user. Only browser `GRANTED` permission is accepted. The UI is capability/permission aware. The delivery adapter is intentionally not configured without VAPID credentials and must never claim production success. Future delivery uses the generic preview “You have a new WYN notification”, never actor text, private content, message bodies, or entity previews. Permanent provider invalidation sets `invalidated_at`; transient failures use the worker's bounded retry policy while the inbox remains durable.

@@ -79,3 +79,7 @@ Engagement commands re-authorize Drop visibility, bidirectional block, follow/pr
 Feed, search and ranking candidates must pass authoritative account, Drop, visibility, bidirectional-block, viewer-mute and distribution-scope policy before serialization; a projection or cache never grants access. Search SQL is parameterized and bounded, and cursors are opaque/versioned and validated. Shared caches contain completed globally public snapshots only, never viewer-specific feed/search/suggestion responses.
 
 Global Trending and Top 100 consume only non-null server-assigned `GLOBAL_PUBLIC` facts. `CLUB_INTERNAL` facts and missing/unknown scopes are rejected from global aggregation. Distinct-actor signals, counted-view dedupe, caps/logarithms, self-action discounts and duplicate/burst penalties are required basic manipulation defenses. Private-search leakage or Club/global ranking contamination is CRITICAL and blocks release.
+
+## Step 12 notification control
+
+Notifications are derived only from trusted outbox facts. Delivery and read paths re-authorize the recipient, current bidirectional block, entity visibility/deletion and account state. System announcements require a trusted System aggregate. Push previews remain generic and push secrets/payloads are prohibited from logs.

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import pg from 'pg';
 import {
   assertTestDatabase,
@@ -34,7 +34,7 @@ async function drop(
   visibility = 'PUBLIC',
 ) {
   const q = await pool.query(
-    `INSERT INTO drops(author_user_id,status,visibility,body,published_at) VALUES($1,$2,$3,$4,CASE WHEN $2='PUBLISHED' THEN now() END) RETURNING id`,
+    `INSERT INTO drops(author_user_id,status,visibility,body,published_at) VALUES($1,$2::drop_status,$3,$4,CASE WHEN $2::drop_status='PUBLISHED' THEN now() END) RETURNING id`,
     [author, status, visibility, body],
   );
   return q.rows[0].id as string;
@@ -50,6 +50,10 @@ run('Step 11 discovery on real PostgreSQL', () => {
     ranking = new RankingService(pool);
   });
   afterAll(async () => pool?.end());
+  beforeEach(async () => {
+    await pool.query('TRUNCATE outbox_events CASCADE');
+    await pool.query('TRUNCATE users CASCADE');
+  });
   it('enforces feed eligibility and stable cursor pagination', async () => {
     const viewer = await user('viewer'),
       good = await user('good'),
@@ -58,7 +62,7 @@ run('Step 11 discovery on real PostgreSQL', () => {
       privateUser = await user('privateuser', 'PRIVATE');
     await pool.query(
       'INSERT INTO follows(follower_id,followed_id) SELECT $1,x FROM unnest($2::uuid[]) x',
-      [viewer, [good, muted, blocked, privateUser]],
+      [viewer, [good, muted, blocked]],
     );
     await pool.query('INSERT INTO mutes(muter_id,muted_id) VALUES($1,$2)', [
       viewer,
@@ -69,8 +73,15 @@ run('Step 11 discovery on real PostgreSQL', () => {
       [blocked, viewer],
     );
     const first = await drop(good, 'first');
-    await new Promise((r) => setTimeout(r, 5));
+    await pool.query(
+      "UPDATE drops SET published_at=now()-interval '1 second' WHERE id=$1",
+      [first],
+    );
     const second = await drop(good, 'second');
+    await pool.query(
+      "UPDATE drops SET published_at=now()+interval '1 second' WHERE id=$1",
+      [second],
+    );
     await drop(muted, 'muted');
     await drop(blocked, 'blocked');
     await drop(privateUser, 'private', 'PUBLISHED', 'FOLLOWERS');

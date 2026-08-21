@@ -1,5 +1,5 @@
 /* Driver rows are checked by parameterized queries and domain invariants. */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import type { Pool, PoolClient } from 'pg';
 import { commentSchema, quoteSchema, shareSchema } from './schemas.js';
 export class EngagementError extends Error {
@@ -148,7 +148,7 @@ export class EngagementService {
         throw new EngagementError('FORBIDDEN');
       if (!q.rows[0].deleted_at) {
         await c.query(
-          "UPDATE comments SET body='',deleted_at=now(),updated_at=now() WHERE id=$1",
+          "UPDATE comments SET body='[deleted]',deleted_at=now(),updated_at=now() WHERE id=$1",
           [id],
         );
         await this.event(

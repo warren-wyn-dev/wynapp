@@ -15,7 +15,7 @@ export default function SavedPage() {
     fetch('/v1/me/saved', { credentials: 'include' })
       .then((r) => {
         if (!r.ok) throw Error();
-        return r.json();
+        return r.json() as Promise<{ data: { items: Saved[] } }>;
       })
       .then((x) => {
         setItems(x.data.items);

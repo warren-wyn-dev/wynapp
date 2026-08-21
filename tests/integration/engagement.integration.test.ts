@@ -142,20 +142,20 @@ run('Step 10 engagement on PostgreSQL', () => {
     const a = await user('alice'),
       d = await drop(a),
       other = await drop(a);
-    await pool.query('INSERT INTO drop_likes(drop_id,user_id) VALUES($1,$2)', [
-      d,
-      a,
-    ]);
+    await pool.query(
+      "INSERT INTO drop_likes(drop_id,user_id,scope) VALUES($1,$2,'GLOBAL_PUBLIC')",
+      [d, a],
+    );
     await expect(
-      pool.query('INSERT INTO drop_likes(drop_id,user_id) VALUES($1,$2)', [
-        d,
-        a,
-      ]),
+      pool.query(
+        "INSERT INTO drop_likes(drop_id,user_id,scope) VALUES($1,$2,'GLOBAL_PUBLIC')",
+        [d, a],
+      ),
     ).rejects.toMatchObject({ code: '23505' });
     const c = await service.comment(d, a, { text: 'parent' }, 'c');
     await expect(
       pool.query(
-        'INSERT INTO comments(drop_id,author_user_id,parent_comment_id,body) VALUES($1,$2,$3,$4)',
+        "INSERT INTO comments(drop_id,author_user_id,parent_comment_id,body,scope) VALUES($1,$2,$3,$4,'GLOBAL_PUBLIC')",
         [other, a, c.id, 'invalid'],
       ),
     ).rejects.toMatchObject({ code: '23503' });
