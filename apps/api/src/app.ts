@@ -48,6 +48,7 @@ import {
   MediaService,
 } from '../../../packages/media/src/service.js';
 import type { MediaStorage } from '../../../packages/media/src/storage.js';
+import { DropError, DropService } from '../../../packages/drop/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -149,15 +150,13 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       : reply.code(503).send({ status: 'not_ready' });
   });
   app.setNotFoundHandler((req, reply) =>
-    reply
-      .code(404)
-      .send({
-        error: {
-          code: 'NOT_FOUND',
-          message: 'The requested resource is unavailable.',
-          requestId: req.requestId,
-        },
-      }),
+    reply.code(404).send({
+      error: {
+        code: 'NOT_FOUND',
+        message: 'The requested resource is unavailable.',
+        requestId: req.requestId,
+      },
+    }),
   );
   const limited = {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
@@ -172,6 +171,45 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   const mediaLimited = {
     config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
   };
+  const drops = new DropService(pool);
+  const dropLimited = {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  };
+  function dropFailure(error: unknown, reply: FastifyReply, requestId: string) {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The Drop is invalid.',
+        requestId,
+      );
+    if (error instanceof DropError) {
+      const status =
+        error.code === 'NOT_FOUND'
+          ? 404
+          : error.code === 'FORBIDDEN'
+            ? 403
+            : 409;
+      return fail(
+        reply,
+        status,
+        error.code,
+        'The Drop operation is not allowed.',
+        requestId,
+      );
+    }
+    const code = (error as { code?: string; message?: string }).code;
+    if (code === '23505' || code === '23514')
+      return fail(
+        reply,
+        409,
+        'DROP_CONSTRAINT',
+        'The Drop violates an attachment or content constraint.',
+        requestId,
+      );
+    throw error;
+  }
   const uuid = z.uuid();
   async function targetId(username: string): Promise<string | null> {
     const q = await pool.query(
@@ -310,12 +348,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           token: token.raw,
         });
       });
-      return reply
-        .code(202)
-        .send({
-          data: { message: 'Registration accepted. Check your email.' },
-          request_id: req.requestId,
-        });
+      return reply.code(202).send({
+        data: { message: 'Registration accepted. Check your email.' },
+        request_id: req.requestId,
+      });
     } catch (e) {
       if ((e as { code?: string }).code === '23505')
         return fail(
@@ -446,12 +482,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           token: t.raw,
         });
       }
-      return reply
-        .code(202)
-        .send({
-          data: { message: 'If eligible, an email will be sent.' },
-          request_id: req.requestId,
-        });
+      return reply.code(202).send({
+        data: { message: 'If eligible, an email will be sent.' },
+        request_id: req.requestId,
+      });
     },
   );
   app.post('/v1/auth/forgot-password', { ...limited }, async (req, reply) => {
@@ -475,12 +509,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         token: t.raw,
       });
     }
-    return reply
-      .code(202)
-      .send({
-        data: { message: 'If the account is eligible, an email will be sent.' },
-        request_id: req.requestId,
-      });
+    return reply.code(202).send({
+      data: { message: 'If the account is eligible, an email will be sent.' },
+      request_id: req.requestId,
+    });
   });
   app.post('/v1/auth/reset-password', { ...limited }, async (req, reply) => {
     const p = resetSchema.parse(req.body);
@@ -661,12 +693,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         );
       });
       clearConsumerCookies(reply);
-      return reply
-        .code(202)
-        .send({
-          data: { state: 'DELETION_PENDING' },
-          request_id: req.requestId,
-        });
+      return reply.code(202).send({
+        data: { state: 'DELETION_PENDING' },
+        request_id: req.requestId,
+      });
     },
   );
   app.get(
@@ -1086,16 +1116,14 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           req.requestId,
         );
       try {
-        return reply
-          .code(201)
-          .send({
-            data: await media.createIntent(
-              req.auth.userId,
-              intentSchema.parse(req.body),
-              req.requestId,
-            ),
-            request_id: req.requestId,
-          });
+        return reply.code(201).send({
+          data: await media.createIntent(
+            req.auth.userId,
+            intentSchema.parse(req.body),
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
       } catch (error) {
         return mediaFailure(error, reply, req.requestId);
       }
@@ -1115,16 +1143,14 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           req.requestId,
         );
       try {
-        return reply
-          .code(202)
-          .send({
-            data: await media.complete(
-              req.auth.userId,
-              uuid.parse((req.params as { id: string }).id),
-              req.requestId,
-            ),
-            request_id: req.requestId,
-          });
+        return reply.code(202).send({
+          data: await media.complete(
+            req.auth.userId,
+            uuid.parse((req.params as { id: string }).id),
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
       } catch (error) {
         return mediaFailure(error, reply, req.requestId);
       }
@@ -1203,5 +1229,179 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         }
       },
     );
+  app.post(
+    '/v1/drops',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.code(201).send({
+          data: await drops.create(
+            req.auth.userId,
+            req.body,
+            'PUBLISHED',
+            req.requestId,
+            req.headers['idempotency-key'] as string | undefined,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.get(
+    '/v1/drops/:id',
+    { preHandler: [optionalConsumer] },
+    async (req, reply) => {
+      try {
+        return reply.send({
+          data: await drops.get(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth?.userId,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.patch(
+    '/v1/drops/:id',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.send({
+          data: await drops.update(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth.userId,
+            req.body,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.delete(
+    '/v1/drops/:id',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        await drops.remove(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        );
+        return reply.code(204).send();
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.get('/v1/me/drafts', { preHandler: [consumer] }, async (req, reply) => {
+    if (!req.auth) return;
+    return reply.send({
+      data: await drops.listDrafts(req.auth.userId),
+      request_id: req.requestId,
+    });
+  });
+  app.post(
+    '/v1/drafts',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.code(201).send({
+          data: await drops.create(
+            req.auth.userId,
+            req.body,
+            'DRAFT',
+            req.requestId,
+            req.headers['idempotency-key'] as string | undefined,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.get('/v1/drafts/:id', { preHandler: [consumer] }, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await drops.get(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (error) {
+      return dropFailure(error, reply, req.requestId);
+    }
+  });
+  app.patch(
+    '/v1/drafts/:id',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.send({
+          data: await drops.update(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth.userId,
+            req.body,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.delete(
+    '/v1/drafts/:id',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        await drops.remove(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        );
+        return reply.code(204).send();
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
+  app.post(
+    '/v1/drafts/:id/publish',
+    { ...dropLimited, preHandler: [consumer, csrf] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.send({
+          data: await drops.publish(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth.userId,
+            req.requestId,
+            req.headers['idempotency-key'] as string | undefined,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (error) {
+        return dropFailure(error, reply, req.requestId);
+      }
+    },
+  );
   return app;
 }

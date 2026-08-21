@@ -121,6 +121,9 @@ importers:
       '@wyn/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@wyn/drop':
+        specifier: workspace:*
+        version: link:../../packages/drop
       '@wyn/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -236,6 +239,19 @@ importers:
       drizzle-kit:
         specifier: 0.31.8
         version: 0.31.8
+
+  packages/drop:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
 
   packages/media:
     dependencies:

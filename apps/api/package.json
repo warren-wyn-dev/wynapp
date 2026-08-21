@@ -25,6 +25,7 @@
     "@fastify/cookie": "11.1.2",
     "@fastify/rate-limit": "11.2.0",
     "@wyn/database": "workspace:*",
+    "@wyn/drop": "workspace:*",
     "argon2": "0.44.0",
     "pg": "8.23.0"
   },
