@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { DEV_EMAIL_LOG_PATH } from './constants.js';
 
 export function uniqueUser(prefix: string) {
   const suffix = (
@@ -34,4 +36,33 @@ export async function registerAndLogin(
   await page.getByLabel('รหัสผ่าน').fill(user.password);
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click();
   await expect(page.getByRole('status')).toHaveText('เข้าสู่ระบบสำเร็จ');
+}
+
+type DevEmail = {
+  to: string;
+  template: 'VERIFY_EMAIL' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED';
+  token?: string;
+};
+
+/**
+ * Reads the raw token out of the most recent matching message
+ * DevelopmentEmailAdapter appended to DEV_EMAIL_LOG_PATH (see
+ * apps/api/src/email.ts) — there is no real mailbox in E2E, so this is how
+ * specs get the actual token the API generated for a verify-email or
+ * password-reset link, rather than stubbing the flow out.
+ */
+export async function readDevEmailToken(
+  to: string,
+  template: DevEmail['template'],
+): Promise<string> {
+  const content = await readFile(DEV_EMAIL_LOG_PATH, 'utf8');
+  const messages: DevEmail[] = content
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as DevEmail);
+  const match = messages
+    .reverse()
+    .find((m) => m.to === to && m.template === template);
+  if (!match?.token) throw new Error(`no ${template} email found for ${to}`);
+  return match.token;
 }

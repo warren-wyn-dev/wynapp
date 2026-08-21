@@ -7,6 +7,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+tests/e2e/.tmp/
 .env
 .env.*
 !.env.example

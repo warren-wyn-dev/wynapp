@@ -4,6 +4,7 @@ import {
   ADMIN_PORT,
   API_ORIGIN,
   API_PORT,
+  DEV_EMAIL_LOG_PATH,
   MOCK_S3_PORT,
   OBJECT_STORAGE_ENV,
   TEST_DATABASE_URL,
@@ -51,6 +52,7 @@ export default defineConfig({
         // a suite that scripts many accounts' logins back to back; this
         // override only takes effect outside production (see server.ts).
         AUTH_RATE_LIMIT_MAX: '1000',
+        DEV_EMAIL_LOG_PATH,
         ...OBJECT_STORAGE_ENV,
       },
     },

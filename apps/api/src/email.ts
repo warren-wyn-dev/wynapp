@@ -1,3 +1,5 @@
+import { appendFile } from 'node:fs/promises';
+
 export type EmailMessage = {
   to: string;
   template: 'VERIFY_EMAIL' | 'PASSWORD_RESET' | 'PASSWORD_CHANGED';
@@ -13,6 +15,12 @@ export class TestEmailAdapter implements EmailAdapter {
   }
 }
 export class DevelopmentEmailAdapter implements EmailAdapter {
+  // Optional: appends every queued message (including the raw token) as a
+  // JSON line to this path. Off by default — only set by E2E, which has no
+  // real mailbox to read a verify/reset link out of and needs the actual
+  // token the API generated, not a stub.
+  constructor(private readonly logPath?: string) {}
+
   async send(message: EmailMessage): Promise<void> {
     console.info(
       JSON.stringify({
@@ -20,6 +28,9 @@ export class DevelopmentEmailAdapter implements EmailAdapter {
         template: message.template,
       }),
     );
+    if (this.logPath) {
+      await appendFile(this.logPath, JSON.stringify(message) + '\n');
+    }
   }
 }
 

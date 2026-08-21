@@ -1,3 +1,5 @@
+import { mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
 import pg from 'pg';
 import { hashPassword } from '../../packages/auth/src/crypto.js';
 import {
@@ -5,6 +7,7 @@ import {
   migrate,
 } from '../../packages/database/src/migrate.js';
 import {
+  DEV_EMAIL_LOG_PATH,
   SEED_ADMIN_EMAIL,
   SEED_ADMIN_PASSWORD,
   TEST_DATABASE_URL,
@@ -14,6 +17,9 @@ import {
 // test database to a known schema and seeds a single admin principal used by
 // the admin-api and admin-ui E2E coverage.
 export default async function globalSetup(): Promise<void> {
+  await rm(DEV_EMAIL_LOG_PATH, { force: true });
+  await mkdir(path.dirname(DEV_EMAIL_LOG_PATH), { recursive: true });
+
   assertTestDatabase(TEST_DATABASE_URL);
   const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
   await client.connect();

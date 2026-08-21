@@ -1,6 +1,22 @@
+import path from 'node:path';
+
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   'postgresql://wyn_test:wyn_test@127.0.0.1:5432/wyn_test';
+
+// There is no real mailbox in E2E — this is where DevelopmentEmailAdapter
+// (apps/api/src/email.ts) appends every queued message, raw token included,
+// so specs can drive the actual verify-email/reset-password links instead
+// of stubbing them out. Playwright always runs from the repo root, same
+// assumption the rest of this file's relative-path-free config already
+// makes.
+export const DEV_EMAIL_LOG_PATH = path.join(
+  process.cwd(),
+  'tests',
+  'e2e',
+  '.tmp',
+  'dev-emails.jsonl',
+);
 export const API_PORT = 4000;
 export const WEB_PORT = 3000;
 export const ADMIN_PORT = 3001;
