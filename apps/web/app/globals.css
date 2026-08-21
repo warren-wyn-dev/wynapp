@@ -132,3 +132,6 @@ a {
     animation: none !important;
   }
 }
+
+/* Identity and profile form styles */
+:root{font-family:Inter,system-ui,sans-serif;color:#17131f;background:#fafafa}*{box-sizing:border-box}body{margin:0}a{color:#5b35d5}.shell{max-width:720px;margin:auto;padding:24px 18px}.card{background:white;border:1px solid #e9e6ef;border-radius:20px;padding:24px;box-shadow:0 8px 30px #2e17400a}.rainbow{height:5px;border-radius:5px;background:linear-gradient(90deg,#ff5a7a,#ffb13b,#54c980,#52a7ff,#9f72ff)}h1{font-size:clamp(1.8rem,8vw,2.8rem);margin:.6em 0}.grid{display:grid;gap:14px}label{font-weight:650}input,textarea,select,button{font:inherit;width:100%;padding:13px;border:1px solid #cbc5d4;border-radius:12px}button{background:#5b35d5;color:white;border:0;font-weight:700;min-height:48px}button:disabled{opacity:.55}.nav{display:flex;gap:14px;flex-wrap:wrap;margin:20px 0}.muted{color:#6c6675}.avatar{width:88px;height:88px;border-radius:50%;background:#eee9f8}@media(min-width:700px){.shell{padding-top:50px}}

@@ -20,10 +20,10 @@
   "dependencies": {
     "@wyn/config": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "pg": "8.13.1"
+    "pg": "8.23.0"
   },
   "devDependencies": {
-    "@types/pg": "8.11.10",
+    "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.8"
   }
 }

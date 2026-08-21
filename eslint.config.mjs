@@ -8,6 +8,7 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '**/coverage/**',
+      '**/next-env.d.ts',
     ],
   },
   js.configs.recommended,
@@ -25,6 +26,19 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/require-await': 'off',
       '@typescript-eslint/unbound-method': 'off',
+    },
+  },
+  {
+    files: ['apps/api/src/app.ts'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ['apps/web/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
+      ],
     },
   },
   {
