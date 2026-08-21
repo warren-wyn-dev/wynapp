@@ -109,6 +109,97 @@ a {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
+.grid {
+  display: grid;
+  gap: 14px;
+}
+label {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.8rem 0;
+  font-weight: 650;
+}
+input,
+textarea,
+select {
+  width: 100%;
+  border: 1px solid var(--wyn-border);
+  border-radius: var(--wyn-radius-sm);
+  padding: 0.65rem 0.75rem;
+  font: inherit;
+  color: inherit;
+  background: white;
+}
+button {
+  border: 0;
+  border-radius: var(--wyn-radius-sm);
+  padding: 0.65rem 1rem;
+  background: var(--wyn-accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--wyn-accent);
+  text-transform: uppercase;
+}
+.muted {
+  color: var(--wyn-muted);
+}
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #f2f0f5;
+  color: var(--wyn-text);
+  white-space: nowrap;
+}
+.report-list {
+  display: grid;
+  gap: 1rem;
+}
+.report-row-card {
+  display: grid;
+  gap: 0.75rem;
+}
+.report-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.case-actions {
+  border: 1px solid var(--wyn-border);
+  border-radius: var(--wyn-radius-sm);
+  padding: 1rem;
+}
+.step-up {
+  border: 1px solid var(--wyn-accent-2);
+  border-radius: var(--wyn-radius-sm);
+  padding: 1rem;
+  background: #ed4f9a11;
+}
+.session-badge {
+  color: var(--wyn-muted);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+[role='alert'] {
+  color: #b91c1c;
+  font-weight: 650;
+}
+[role='status'] {
+  color: var(--wyn-muted);
+}
 @keyframes spin {
   to {
     transform: rotate(360deg);

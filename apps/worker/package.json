@@ -14,8 +14,12 @@
   "dependencies": {
     "@wyn/observability": "workspace:*",
     "@wyn/notifications": "workspace:*",
+    "@wyn/media": "workspace:*",
     "pg": "8.23.0",
-    "zod": "3.24.1"
+    "zod": "3.24.1",
+    "sharp": "0.35.0",
+    "@aws-sdk/client-s3": "3.864.0",
+    "@aws-sdk/s3-request-presigner": "3.864.0"
   },
   "devDependencies": {
     "tsx": "4.19.2"

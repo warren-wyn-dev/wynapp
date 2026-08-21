@@ -11,13 +11,10 @@ import {
 } from './constants.js';
 import { uniqueUser } from './helpers.js';
 
-// There is currently no Admin frontend to drive with a browser (every route
-// under apps/admin/app is a placeholder page with no markup or fetch calls —
-// see the PR description). This file exercises the real Admin HTTP surface
-// over the network instead, against the same running API server the browser
-// specs use, so the admin auth/session/CSRF/step-up/moderation machinery
-// gets at least one execution path that isn't the in-process integration
-// suite.
+// This file exercises the real Admin HTTP surface directly over the network,
+// against the same running API server the browser specs use, independent of
+// whatever the Admin UI does with the responses. tests/e2e/admin-ui.spec.ts
+// covers the same moderation loop by driving the actual Admin frontend.
 test.use({ baseURL: API_ORIGIN });
 
 async function consumerCsrf(request: APIRequestContext): Promise<string> {

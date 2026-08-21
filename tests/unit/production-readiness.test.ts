@@ -9,7 +9,9 @@ const valid = {
   API_ORIGIN: 'https://api.staging.wyn.example',
   SESSION_SECRET: 'x'.repeat(32),
   OBJECT_STORAGE_BUCKET: 'wyn-staging',
+  OBJECT_STORAGE_QUARANTINE_BUCKET: 'wyn-staging-quarantine',
   OBJECT_STORAGE_REGION: 'us-east-1',
+  OBJECT_STORAGE_CDN_ORIGIN: 'https://cdn.staging.wyn.example',
   EMAIL_FROM: 'no-reply@wyn.example',
   OBSERVABILITY_DSN: 'configured',
 };

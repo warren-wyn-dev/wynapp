@@ -1,10 +1,15 @@
 import { defineConfig } from '@playwright/test';
 import {
+  ADMIN_ORIGIN,
+  ADMIN_PORT,
   API_ORIGIN,
   API_PORT,
+  MOCK_S3_PORT,
+  OBJECT_STORAGE_ENV,
   TEST_DATABASE_URL,
   WEB_ORIGIN,
   WEB_PORT,
+  WORKER_HEALTH_PORT,
 } from './tests/e2e/constants.js';
 
 const reuse = !process.env.CI;
@@ -46,6 +51,7 @@ export default defineConfig({
         // a suite that scripts many accounts' logins back to back; this
         // override only takes effect outside production (see server.ts).
         AUTH_RATE_LIMIT_MAX: '1000',
+        ...OBJECT_STORAGE_ENV,
       },
     },
     {
@@ -54,6 +60,42 @@ export default defineConfig({
       reuseExistingServer: reuse,
       timeout: 60000,
       env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(WEB_PORT) },
+    },
+    {
+      command: 'pnpm --filter @wyn/admin start',
+      url: `${ADMIN_ORIGIN}/login`,
+      reuseExistingServer: reuse,
+      timeout: 60000,
+      env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(ADMIN_PORT) },
+    },
+    {
+      // Nothing in apps/worker's deployable entrypoint previously called
+      // the notification-dispatch loop at all (see the fix in
+      // apps/worker/src/main.ts) — without this, notifications from real
+      // actions (like, follow, mention, ...) never get created, so this is
+      // load-bearing for tests/e2e/notifications.spec.ts.
+      command: 'pnpm --filter @wyn/worker start',
+      url: `http://localhost:${WORKER_HEALTH_PORT}/health`,
+      reuseExistingServer: reuse,
+      timeout: 30000,
+      env: {
+        WORKER_ID: 'e2e-worker',
+        DATABASE_URL: TEST_DATABASE_URL,
+        WORKER_HEALTH_PORT: String(WORKER_HEALTH_PORT),
+        WORKER_POLL_INTERVAL_MS: '250',
+        ...OBJECT_STORAGE_ENV,
+      },
+    },
+    {
+      // A minimal in-memory S3-compatible test double (see
+      // tests/e2e/mock-s3-server.ts) so the media upload/processing E2E
+      // coverage exercises the real S3MediaStorage/AWS SDK code path
+      // without needing real cloud credentials.
+      command: `pnpm exec tsx tests/e2e/mock-s3-server.ts`,
+      url: `${OBJECT_STORAGE_ENV.OBJECT_STORAGE_ENDPOINT}/health`,
+      reuseExistingServer: reuse,
+      timeout: 15000,
+      env: { MOCK_S3_PORT: String(MOCK_S3_PORT) },
     },
   ],
 });

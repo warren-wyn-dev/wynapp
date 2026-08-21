@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createDatabase } from '../../../packages/database/src/index.js';
+import { createS3MediaStorageFromEnv } from '../../../packages/media/src/storage.js';
 import { buildApp } from './app.js';
 import { DevelopmentEmailAdapter, ProductionEmailAdapter } from './email.js';
 
@@ -22,10 +23,12 @@ const email =
   config.WYN_ENV === 'production'
     ? new ProductionEmailAdapter()
     : new DevelopmentEmailAdapter();
+const storage = createS3MediaStorageFromEnv(process.env);
 const app = await buildApp({
   pool: database.pool,
   email,
   allowedOrigins: [config.APP_ORIGIN, config.ADMIN_ORIGIN],
+  ...(storage ? { storage } : {}),
   // Only honored outside production, so a stray env var can never weaken
   // the real auth rate limit; non-production runners (CI/E2E) that do many
   // scripted logins in a short window can raise it explicitly.
