@@ -5,6 +5,7 @@ import {
   TEST_DATABASE_URL,
   WEB_ORIGIN,
   WEB_PORT,
+  WORKER_HEALTH_PORT,
 } from './tests/e2e/constants.js';
 
 const reuse = !process.env.CI;
@@ -54,6 +55,23 @@ export default defineConfig({
       reuseExistingServer: reuse,
       timeout: 60000,
       env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(WEB_PORT) },
+    },
+    {
+      // Nothing in apps/worker's deployable entrypoint previously called
+      // the notification-dispatch loop at all (see the fix in
+      // apps/worker/src/main.ts) — without this, notifications from real
+      // actions (like, follow, mention, ...) never get created, so this is
+      // load-bearing for tests/e2e/notifications.spec.ts.
+      command: 'pnpm --filter @wyn/worker start',
+      url: `http://localhost:${WORKER_HEALTH_PORT}/health`,
+      reuseExistingServer: reuse,
+      timeout: 30000,
+      env: {
+        WORKER_ID: 'e2e-worker',
+        DATABASE_URL: TEST_DATABASE_URL,
+        WORKER_HEALTH_PORT: String(WORKER_HEALTH_PORT),
+        WORKER_POLL_INTERVAL_MS: '250',
+      },
     },
   ],
 });
