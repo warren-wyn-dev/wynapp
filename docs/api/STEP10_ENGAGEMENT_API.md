@@ -1,0 +1,3 @@
+# Step 10 Engagement API
+
+All mutations require a Consumer session, CSRF token, Origin check, request ID and actor rate limit. Routes: `POST|DELETE /v1/drops/:id/like`, `POST|GET /v1/drops/:id/comments`, `POST /v1/comments/:id/replies`, `DELETE /v1/comments/:id`, `POST|DELETE /v1/drops/:id/redrop`, `POST /v1/drops/:id/quote-redrop`, `POST|DELETE /v1/drops/:id/save`, `GET /v1/me/saved`, `POST /v1/drops/:id/view`, and `POST /v1/drops/:id/share`. Responses use the stable `{data,request_id}` or `{error:{code,message,request_id}}` envelope. Comment PATCH is deferred pending an approved edit policy.
