@@ -26,7 +26,7 @@ This design does not add automated/AI moderation, law-enforcement workflows, liv
 | Audit | append-only important action record and protected retrieval | accepts structured audit append in the same transaction where feasible | `appendAuditEvent`, permission-scoped query |
 | Notifications | policy-approved notices to reporter/target | consumes committed events; rechecks visibility/block/preferences | `ModerationNoticeRequested` consumption |
 
-Dependencies are directional: Admin → Moderation → target-module ports/Audit; Safety → Moderation via report/outbox; Safety → Social Graph's read-only policy port. All block/mute writes enter through Social Graph, which owns the transaction that creates/removes the edge and removes conflicting follows or pending requests; Safety never duplicates those commands or writes graph tables. Target modules must not depend on Admin. Audit records facts but never drives authorization or moderation state.
+Dependencies are directional: Admin → Moderation → target-module ports/Audit; Safety → Moderation via report/outbox; Safety → Social Graph's read-only policy port. All block/mute writes enter through Social Graph, which owns the transaction that creates/removes the edge and removes conflicting follows or pending requests; Safety never duplicates those commands or writes graph tables. Architecture and contract tests must reject any Safety repository or command handler that mutates `blocks`, `mutes`, follows, or follow requests directly. Target modules must not depend on Admin. Audit records facts but never drives authorization or moderation state.
 
 ## 3. Logical records and privacy ownership
 
