@@ -1,0 +1,3 @@
+# Notification Security Review
+
+Consumer APIs cannot create notifications and ignore recipient IDs. Only outbox facts reach the worker. `SYSTEM_ANNOUNCEMENT` requires the trusted `System` aggregate and is unavailable from consumer routes. Every read/write is authenticated, recipient-scoped, CSRF protected for mutation, validated and rate limited. Mention targets are resolved by the server, capped by Drop validation, block-filtered at write and rechecked at delivery. Push endpoint/key sizes are bounded and ownership is enforced. Logs contain event IDs and safe error classes, not payload or endpoint secrets. No unresolved CRITICAL or HIGH issue was identified in the Step 12 review.

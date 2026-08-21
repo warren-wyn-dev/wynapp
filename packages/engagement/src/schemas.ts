@@ -6,6 +6,7 @@ const safeText = (max: number) =>
     .min(1)
     .max(max)
     .refine(
+      // eslint-disable-next-line no-control-regex -- these are the exact unsafe controls rejected at the boundary
       (v) => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u.test(v),
       'Invalid control character',
     );

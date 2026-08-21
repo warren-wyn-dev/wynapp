@@ -212,3 +212,7 @@ Before physical schema approval, Database Engineering must provide an ERD, data 
 - **MEDIUM — polymorphic references:** mentions, shares, reports and audit targets need constrained type registries plus application/database integrity checks; arbitrary type/ID pairs are prohibited.
 - **MEDIUM — multi-row invariants:** maximum nine media, two direct-chat members and one Club owner require serialized transactions plus database constraint triggers/ownership uniqueness, not client checks.
 - **Review result:** logical integrity is acceptable for **PROPOSED** architecture subject to the listed Founder decisions, CTO/QA review, and a later physical-schema review. No migration or application implementation is approved by this document.
+
+## Step 12 implementation note
+
+Migration `0007_step12_notifications.sql` implements recipient-scoped notifications, category preferences, Web Push subscriptions, and notification outbox deliveries. Composite cursor, partial unread/active-subscription, preference, unique dedupe, and queue-claim indexes cover the V1 query paths. Payloads are bounded JSON objects and never authoritative content.

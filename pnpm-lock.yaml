@@ -127,6 +127,9 @@ importers:
       '@wyn/engagement':
         specifier: workspace:*
         version: link:../../packages/engagement
+      '@wyn/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@wyn/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -198,9 +201,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@wyn/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@wyn/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
       zod:
         specifier: 3.24.1
         version: 3.24.1
@@ -296,6 +305,19 @@ importers:
       sharp:
         specifier: 0.35.0
         version: 0.35.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+
+  packages/notifications:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
       zod:
         specifier: 4.4.3
         version: 4.4.3

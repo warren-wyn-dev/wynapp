@@ -16,6 +16,7 @@ type Comment = {
   display_name: string;
   deleted_at?: string;
 };
+type ApiResult<T> = { data: T };
 export function EngagementPanel({
   dropId,
   initial,
@@ -39,7 +40,11 @@ export function EngagementPanel({
         (v) => v.startsWith('__Host-wyn_csrf=') || v.startsWith('wyn_csrf='),
       )
       ?.split('=')[1] ?? '';
-  async function mutate(path: string, method = 'POST', body?: object) {
+  async function mutate<T>(
+    path: string,
+    method = 'POST',
+    body?: object,
+  ): Promise<ApiResult<T> | null> {
     setBusy(path);
     setError('');
     try {
@@ -51,7 +56,7 @@ export function EngagementPanel({
       });
       if (r.status === 401) throw Error('กรุณาเข้าสู่ระบบ');
       if (!r.ok) throw Error('ดำเนินการไม่สำเร็จ');
-      return r.status === 204 ? null : await r.json();
+      return r.status === 204 ? null : ((await r.json()) as ApiResult<T>);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'เกิดข้อผิดพลาด');
       throw e;
@@ -62,11 +67,16 @@ export function EngagementPanel({
   useEffect(() => {
     if (!compact) {
       fetch(`/v1/drops/${dropId}/comments`, { credentials: 'include' })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((r) =>
+          r.ok
+            ? (r.json() as Promise<ApiResult<{ items: Comment[] }>>)
+            : Promise.reject(new Error('Comments unavailable')),
+        )
         .then((x) => setComments(x.data.items))
-        .catch(() => {});
+        .catch(() => undefined);
     }
-    if (countView) void mutate(`/v1/drops/${dropId}/view`).catch(() => {});
+    if (countView)
+      void mutate<unknown>(`/v1/drops/${dropId}/view`).catch(() => undefined);
   }, [dropId, countView, compact]);
   async function toggleLike() {
     const before = counts;
@@ -76,11 +86,11 @@ export function EngagementPanel({
       likes_count: c.likes_count + (c.liked ? -1 : 1),
     }));
     try {
-      const x = await mutate(
+      const x = await mutate<Counts>(
         `/v1/drops/${dropId}/like`,
         before.liked ? 'DELETE' : 'POST',
       );
-      setCounts((c) => ({ ...c, ...x.data }));
+      if (x) setCounts((c) => ({ ...c, ...x.data }));
     } catch {
       setCounts(before);
     }
@@ -88,11 +98,16 @@ export function EngagementPanel({
   async function addComment() {
     if (!text.trim()) return;
     try {
-      const x = await mutate(`/v1/drops/${dropId}/comments`, 'POST', { text });
+      const x = await mutate<Comment>(`/v1/drops/${dropId}/comments`, 'POST', {
+        text,
+      });
+      if (!x) throw new Error('Comment response unavailable');
       setComments((c) => [...c, x.data]);
       setCounts((c) => ({ ...c, comments_count: c.comments_count + 1 }));
       setText('');
-    } catch {}
+    } catch {
+      // mutate already exposes the localized error state.
+    }
   }
   async function share() {
     try {
@@ -102,7 +117,9 @@ export function EngagementPanel({
       await mutate(`/v1/drops/${dropId}/share`, 'POST', {
         channel: canShare ? 'WEB_SHARE' : 'COPY_LINK',
       });
-    } catch {}
+    } catch {
+      // Browser share cancellation is not an application error.
+    }
   }
   return (
     <section

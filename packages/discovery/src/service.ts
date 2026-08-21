@@ -212,6 +212,16 @@ export class RankingService {
           GROUP BY dh.hashtag_id HAVING count(DISTINCT d.author_user_id)>=2) topics ORDER BY score DESC LIMIT 50`,
         [trendingWindow, now],
       );
+      await c.query(
+        `INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id)
+        SELECT 'TrendingAchieved','Drop',drop_id,jsonb_build_object('ranking_window',$1::timestamptz::text),'ranking-recompute' FROM trending_drop_snapshots WHERE window_started_at=$1::timestamptz AND rank<=10`,
+        [trendingWindow],
+      );
+      await c.query(
+        `INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id)
+        SELECT 'Top100Achieved','User',creator_user_id,jsonb_build_object('recipient_user_id',creator_user_id::text,'ranking_window',$1::timestamptz::text),'ranking-recompute' FROM top_creator_snapshots WHERE window_started_at=$1::timestamptz`,
+        [creatorWindow],
+      );
       await c.query('COMMIT');
       return {
         computed_at: now,

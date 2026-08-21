@@ -155,7 +155,7 @@ export function DropComposer({ initialDraftId }: { initialDraftId?: string }) {
     }
   }
   return (
-    <section className="wyn-card drop-composer">
+    <section className="wyn-card drop-composer" data-draft-id={initialDraftId}>
       <header>
         <span className="eyebrow">CREATE DROP</span>
         <h1>เล่าเรื่องของคุณ</h1>

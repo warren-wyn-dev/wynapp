@@ -27,6 +27,7 @@
     "@wyn/database": "workspace:*",
     "@wyn/drop": "workspace:*",
     "@wyn/engagement": "workspace:*",
+    "@wyn/notifications": "workspace:*",
     "argon2": "0.44.0",
     "pg": "8.23.0"
   },
