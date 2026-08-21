@@ -109,27 +109,14 @@ These are things the code does not do today, found while wiring the rest
 of this together. None of them are "missing configuration"; they need
 actual implementation or a product decision, not just an env var.
 
-- **`apps/web` has no page that consumes a verify-email or password-reset
-  link.** Now that `ResendEmailAdapter` sends real emails with real
-  `${APP_ORIGIN}/verify-email?token=...` and
-  `${APP_ORIGIN}/reset-password?token=...` links, this is the actual
-  blocker: `apps/web/app/verify-email/page.tsx` and
-  `apps/web/app/reset-password/page.tsx` are both static placeholders —
-  neither reads the `token` query param, and neither has a submit handler
-  wired to `POST /v1/auth/verify-email` or `POST /v1/auth/reset-password`.
-  The API side of both flows is implemented and tested; a user who clicks
-  the link in the email lands on a page that does nothing. Build these two
-  pages before launch, or registration/password-reset are dead ends.
-- **The Admin app only covers moderation.** Login, the report queue, case
-  triage, and moderation actions (with step-up re-auth) are implemented
-  and covered by a real browser E2E test
+- **The Admin app only covers moderation.** Login, logout, the report
+  queue, case triage, and moderation actions (with step-up re-auth) are
+  implemented and covered by a real browser E2E test
   (`tests/e2e/admin-ui.spec.ts`), not just the API-level
   `tests/e2e/admin-api.spec.ts`. Users/Content/Clubs/Analytics/Settings
   are still static placeholders — there is no backend API for them yet,
-  so there was nothing to build a UI against. There is also no admin
-  logout endpoint (`/admin/v1/auth/*` has no `logout` route); the 8-hour
-  session simply expires. Neither blocks the moderation workflow itself,
-  but both are gaps to flag before calling Admin "done."
+  so there was nothing to build a UI against. That's a real gap, but it
+  doesn't block the moderation workflow itself.
 - **Web and Admin have no client-side error tracking.** `OBSERVABILITY_DSN`
   wires server-side reporting (unhandled 500s in the API, failed
   dispatch-loop iterations in the Worker) via `packages/observability`'s
@@ -152,7 +139,13 @@ actual implementation or a product decision, not just an env var.
   staging pass — including the `pnpm readiness:backup-restore` drill
   against the actual managed database and object storage, not just the
   disposable local Postgres it currently targets — before pointing a real
-  domain at any of this.
+  domain at any of this. (Even the CI-only environment wasn't reliable
+  until recently: the `verify` GitHub Actions job's E2E step was failing
+  on every push — `tsx` was only a devDependency of `apps/api`/
+  `apps/worker`, not the workspace root, so a clean `pnpm install
+--frozen-lockfile` couldn't resolve it for
+  `playwright.config.ts`'s mock-S3 webServer entry. Fixed; the `verify`
+  job is green as of this writing.)
 
 ## 4. Suggested order
 
