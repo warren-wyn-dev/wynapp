@@ -1,0 +1,1 @@
+export default function Reset(){return <section className="card"><h1>ตั้งรหัสผ่านใหม่</h1><form className="grid"><label>รหัสผ่านใหม่<input type="password" minLength={12}/></label><button>เปลี่ยนรหัสผ่าน</button><p className="muted">โทเค็นที่หมดอายุ ใช้แล้ว หรือไม่ถูกต้องจะถูกปฏิเสธ</p></form></section>}

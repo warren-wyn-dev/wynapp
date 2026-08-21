@@ -1,0 +1,1 @@
+export default function Account(){return <section className="card"><h1>แก้ไขโปรไฟล์</h1><form className="grid"><label>ชื่อที่แสดง<input maxLength={50}/></label><label>ประวัติ<textarea maxLength={500}/></label><label>เว็บไซต์<input type="url"/></label><label>ตำแหน่ง<input maxLength={100}/></label><button>บันทึก</button></form></section>}

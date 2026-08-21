@@ -1,0 +1,1 @@
+export default async function Profile({params}:{params:Promise<{username:string}>}){const {username}=await params;return <section className="card"><div className="avatar"/><h1>@{username}</h1><p className="muted">โปรไฟล์สาธารณะแสดงเฉพาะข้อมูลที่ปลอดภัย</p></section>}
