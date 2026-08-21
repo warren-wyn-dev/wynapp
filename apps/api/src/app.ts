@@ -53,6 +53,10 @@ import {
   EngagementError,
   EngagementService,
 } from '../../../packages/engagement/src/index.js';
+import {
+  DiscoveryError,
+  DiscoveryService,
+} from '../../../packages/discovery/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -177,6 +181,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   };
   const drops = new DropService(pool);
   const engagement = new EngagementService(pool);
+  const discovery = new DiscoveryService(pool);
   const engageLimited = {
     config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
   };
@@ -1660,5 +1665,212 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       return engagementFailure(e, reply, req.requestId);
     }
   });
+  const discoveryLimited = {
+    preHandler: [consumer],
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+  };
+  const discoveryQuery = z.object({
+    cursor: z.string().max(500).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    q: z.string().trim().min(1).max(200).optional(),
+  });
+  function discoveryFailure(
+    error: unknown,
+    reply: FastifyReply,
+    requestId: string,
+  ) {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The discovery request is invalid.',
+        requestId,
+      );
+    if (error instanceof DiscoveryError)
+      return fail(
+        reply,
+        error.code === 'NOT_FOUND' ? 404 : 400,
+        error.code,
+        'The discovery resource is unavailable.',
+        requestId,
+      );
+    throw error;
+  }
+  app.get('/v1/feed/following', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: await discovery.following(req.auth.userId, q.cursor, q.limit),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/feed/for-you', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: await discovery.forYou(req.auth.userId, q.cursor, q.limit),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/search/users', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery
+        .extend({ q: z.string().trim().min(1).max(100) })
+        .parse(req.query);
+      return reply.send({
+        data: await discovery.searchUsers(
+          req.auth.userId,
+          q.q,
+          q.cursor,
+          q.limit,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/search/drops', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery
+        .extend({ q: z.string().trim().min(1).max(200) })
+        .parse(req.query);
+      return reply.send({
+        data: await discovery.searchDrops(
+          req.auth.userId,
+          q.q,
+          q.cursor,
+          q.limit,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/search/hashtags', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery
+        .extend({ q: z.string().trim().min(1).max(51) })
+        .parse(req.query);
+      return reply.send({
+        data: await discovery.searchHashtags(q.q, q.cursor, q.limit),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/search', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const q = discoveryQuery
+        .extend({ q: z.string().trim().min(1).max(100) })
+        .parse(req.query);
+      const [users, drops, hashtags] = await Promise.all([
+        discovery.searchUsers(req.auth.userId, q.q, undefined, 5),
+        discovery.searchDrops(req.auth.userId, q.q, undefined, 10),
+        discovery.searchHashtags(q.q, undefined, 5),
+      ]);
+      return reply.send({
+        data: {
+          users: users.items,
+          drops: drops.items,
+          hashtags: hashtags.items,
+        },
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/topics/:slug', discoveryLimited, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      const slug = z
+        .string()
+        .regex(/^[a-z0-9-]{1,60}$/)
+        .parse((req.params as { slug: string }).slug);
+      return reply.send({
+        data: await discovery.topic(slug, req.auth.userId),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return discoveryFailure(e, reply, req.requestId);
+    }
+  });
+  app.get(
+    '/v1/discovery/suggested-users',
+    discoveryLimited,
+    async (req, reply) => {
+      if (!req.auth) return;
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: {
+          items: await discovery.suggestedUsers(req.auth.userId, q.limit),
+        },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.get(
+    '/v1/discovery/suggested-content',
+    discoveryLimited,
+    async (req, reply) => {
+      if (!req.auth) return;
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: await discovery.forYou(req.auth.userId, q.cursor, q.limit),
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.get(
+    '/v1/discovery/trending-drops',
+    discoveryLimited,
+    async (req, reply) => {
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: { items: await discovery.snapshots('drops', q.limit) },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.get(
+    '/v1/discovery/trending-topics',
+    discoveryLimited,
+    async (req, reply) => {
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: { items: await discovery.snapshots('topics', q.limit) },
+        request_id: req.requestId,
+      });
+    },
+  );
+  app.get(
+    '/v1/discovery/top-creators',
+    discoveryLimited,
+    async (req, reply) => {
+      const q = discoveryQuery.parse(req.query);
+      return reply.send({
+        data: {
+          items: await discovery.snapshots('creators', Math.min(q.limit, 100)),
+        },
+        request_id: req.requestId,
+      });
+    },
+  );
   return app;
 }

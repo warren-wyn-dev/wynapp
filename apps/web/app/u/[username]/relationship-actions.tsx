@@ -5,8 +5,9 @@ import { useState } from 'react';
 type State = 'NONE' | 'FOLLOWING' | 'REQUESTED';
 type RelationshipActionsProps = {
   username: string;
-  initial?: State;
-  initialRequestId?: string;
+  initial?: State | undefined;
+  initialRequestId?: string | undefined;
+  compact?: boolean;
 };
 
 function csrfToken(): string {
@@ -21,6 +22,7 @@ export function RelationshipActions({
   username,
   initial = 'NONE',
   initialRequestId,
+  compact = false,
 }: RelationshipActionsProps) {
   const [state, setState] = useState<State>(initial);
   const [requestId, setRequestId] = useState(initialRequestId);
@@ -28,14 +30,11 @@ export function RelationshipActions({
   const [error, setError] = useState('');
 
   async function mutate(path: string, method: 'POST' | 'DELETE') {
-    return fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}${path}`,
-      {
-        method,
-        credentials: 'include',
-        headers: { 'x-csrf-token': csrfToken() },
-      },
-    );
+    return fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}${path}`, {
+      method,
+      credentials: 'include',
+      headers: { 'x-csrf-token': csrfToken() },
+    });
   }
 
   async function change() {
@@ -44,7 +43,10 @@ export function RelationshipActions({
     setError('');
     try {
       if (state === 'REQUESTED' && requestId) {
-        const response = await mutate(`/v1/follow-requests/${requestId}`, 'DELETE');
+        const response = await mutate(
+          `/v1/follow-requests/${requestId}`,
+          'DELETE',
+        );
         if (!response.ok) throw new Error('cancel failed');
         setState('NONE');
         setRequestId(undefined);
@@ -97,7 +99,10 @@ export function RelationshipActions({
   }
 
   return (
-    <div className="grid" aria-live="polite">
+    <div
+      className={compact ? 'relationship-actions-compact' : 'grid'}
+      aria-live="polite"
+    >
       <button disabled={busy} onClick={() => void change()}>
         {busy
           ? 'กำลังดำเนินการ…'
@@ -108,15 +113,25 @@ export function RelationshipActions({
               : 'ติดตาม'}
       </button>
       {error && <p role="alert">{error}</p>}
-      <details>
-        <summary>ตัวเลือกความสัมพันธ์</summary>
-        <button type="button" disabled={busy} onClick={() => void preference('block')}>
-          บล็อก
-        </button>
-        <button type="button" disabled={busy} onClick={() => void preference('mute')}>
-          ปิดเสียง
-        </button>
-      </details>
+      {!compact && (
+        <details>
+          <summary>ตัวเลือกความสัมพันธ์</summary>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void preference('block')}
+          >
+            บล็อก
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void preference('mute')}
+          >
+            ปิดเสียง
+          </button>
+        </details>
+      )}
     </div>
   );
 }
