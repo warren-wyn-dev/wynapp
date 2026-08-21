@@ -12,6 +12,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </a>
             <a href="/">Home</a>
             <a href="/search">Discovery</a>
+            <a href="/clubs">Clubs</a>
             <a href="/notifications">การแจ้งเตือน</a>
             <a href="/create">สร้าง Drop</a>
             <a href="/profile">โปรไฟล์</a>

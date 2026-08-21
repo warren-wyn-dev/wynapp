@@ -1,6 +1,8 @@
 export const MEDIA_PURPOSES = [
   'PROFILE_AVATAR',
   'PROFILE_COVER',
+  'CLUB_AVATAR',
+  'CLUB_COVER',
   'DROP_IMAGE',
   'CLUB_IMAGE',
   'CHAT_IMAGE',
