@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { registerAndLogin, uniqueUser } from './helpers';
+import { registerAndLogin, uniqueUser } from './helpers.js';
 
 test.describe('Drop create, view, and like', () => {
   test('publish a text Drop and see it in the feed and its own page', async ({

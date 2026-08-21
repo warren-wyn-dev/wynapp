@@ -28,11 +28,11 @@ export default async function globalSetup(): Promise<void> {
   const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL });
   try {
     const passwordHash = await hashPassword(SEED_ADMIN_PASSWORD);
-    const users = await pool.query(
+    const users = await pool.query<{ id: string }>(
       'INSERT INTO users(email_normalized,email_verified_at) VALUES($1,now()) RETURNING id',
       [SEED_ADMIN_EMAIL],
     );
-    const userId = users.rows[0].id as string;
+    const userId = users.rows[0]!.id;
     await pool.query(
       'INSERT INTO user_credentials(user_id,password_hash) VALUES($1,$2)',
       [userId, passwordHash],

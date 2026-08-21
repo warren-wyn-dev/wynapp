@@ -28,16 +28,10 @@ export default defineConfig({
   },
   webServer: [
     {
-      // The compiled apps/api/dist/**/server.js cannot actually run: tsc
-      // mirrors this app's cross-package relative imports (e.g.
-      // ../../../packages/database) into apps/api/dist/packages/..., which
-      // then can't resolve those packages' own node_modules (drizzle-orm
-      // etc.) at runtime. That's a real production-deployability bug
-      // (`pnpm --filter @wyn/api start` is broken), tracked separately from
-      // this test harness. Running the TS source directly exercises the
-      // same app.ts/server.ts over a real HTTP server without depending on
-      // that broken build output.
-      command: 'pnpm --filter @wyn/api exec tsx src/server.ts',
+      // Runs the actual production artifact (apps/api/dist/server.js, built
+      // by `pnpm build` beforehand) rather than the TS source, so this
+      // exercises the same start command a real deployment would use.
+      command: 'pnpm --filter @wyn/api start',
       url: `${API_ORIGIN}/health`,
       reuseExistingServer: reuse,
       timeout: 30000,
@@ -48,6 +42,10 @@ export default defineConfig({
         API_HOST: '127.0.0.1',
         API_PORT: String(API_PORT),
         APP_ORIGIN: WEB_ORIGIN,
+        // The real auth rate limit (10/minute) is sized for one human, not
+        // a suite that scripts many accounts' logins back to back; this
+        // override only takes effect outside production (see server.ts).
+        AUTH_RATE_LIMIT_MAX: '1000',
       },
     },
     {

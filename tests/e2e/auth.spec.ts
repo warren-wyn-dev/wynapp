@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { registerAndLogin, uniqueUser } from './helpers';
+import { registerAndLogin, uniqueUser } from './helpers.js';
 
 test.describe('consumer authentication', () => {
   test('register, login, session survives navigation, and logout', async ({

@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call -- response.json() crosses an untyped HTTP boundary, same rationale as packages/admin/src/service.ts */
 import { randomUUID } from 'node:crypto';
+import type { APIRequestContext } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import {
   ADMIN_ORIGIN,
@@ -6,8 +8,8 @@ import {
   SEED_ADMIN_EMAIL,
   SEED_ADMIN_PASSWORD,
   WEB_ORIGIN,
-} from './constants';
-import { uniqueUser } from './helpers';
+} from './constants.js';
+import { uniqueUser } from './helpers.js';
 
 // There is currently no Admin frontend to drive with a browser (every route
 // under apps/admin/app is a placeholder page with no markup or fetch calls —
@@ -18,9 +20,7 @@ import { uniqueUser } from './helpers';
 // suite.
 test.use({ baseURL: API_ORIGIN });
 
-async function consumerCsrf(
-  request: import('@playwright/test').APIRequestContext,
-): Promise<string> {
+async function consumerCsrf(request: APIRequestContext): Promise<string> {
   const state = await request.storageState();
   const cookie = state.cookies.find((c) => c.name === '__Host-wyn_csrf');
   if (!cookie) throw new Error('consumer CSRF cookie missing');

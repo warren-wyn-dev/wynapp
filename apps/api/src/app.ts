@@ -71,6 +71,11 @@ type Deps = {
   storage?: MediaStorage;
   allowedOrigins?: readonly string[];
   ready?: () => Promise<boolean>;
+  // Test/staging-only override for the auth-endpoint rate limit (default 10
+  // requests/minute, matching production). server.ts only forwards this
+  // from AUTH_RATE_LIMIT_MAX when explicitly set, so production is
+  // unaffected unless a deployer opts in.
+  authRateLimitMax?: number;
 };
 const genericAuth = {
   code: 'INVALID_CREDENTIALS',
@@ -175,7 +180,12 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     }),
   );
   const limited = {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    config: {
+      rateLimit: {
+        max: options.authRateLimitMax ?? 10,
+        timeWindow: '1 minute',
+      },
+    },
   };
   const social = new SocialService(pool);
   const socialLimited = {
