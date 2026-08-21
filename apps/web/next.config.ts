@@ -1,8 +1,16 @@
 import type { NextConfig } from 'next';
+const apiOrigin = process.env.API_ORIGIN ?? 'http://localhost:4000';
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@wyn/ui'],
+  async rewrites() {
+    // The API's session/CSRF cookies are `__Host-` prefixed, which locks
+    // them to the exact origin that set them. Proxying `/v1/*` through this
+    // app's own origin keeps the browser same-origin with the API so those
+    // cookies are actually sent back on subsequent requests.
+    return [{ source: '/v1/:path*', destination: `${apiOrigin}/v1/:path*` }];
+  },
   async headers() {
     return [
       {

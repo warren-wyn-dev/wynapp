@@ -51,7 +51,10 @@ export function EngagementPanel({
       const r = await fetch(path, {
         method,
         credentials: 'include',
-        headers: { 'content-type': 'application/json', 'x-csrf-token': csrf() },
+        headers: {
+          ...(body ? { 'content-type': 'application/json' } : {}),
+          'x-csrf-token': csrf(),
+        },
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       if (r.status === 401) throw Error('กรุณาเข้าสู่ระบบ');

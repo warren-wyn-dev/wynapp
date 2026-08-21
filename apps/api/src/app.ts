@@ -71,6 +71,11 @@ type Deps = {
   storage?: MediaStorage;
   allowedOrigins?: readonly string[];
   ready?: () => Promise<boolean>;
+  // Test/staging-only override for the auth-endpoint rate limit (default 10
+  // requests/minute, matching production). server.ts only forwards this
+  // from AUTH_RATE_LIMIT_MAX when explicitly set, so production is
+  // unaffected unless a deployer opts in.
+  authRateLimitMax?: number;
 };
 const genericAuth = {
   code: 'INVALID_CREDENTIALS',
@@ -141,6 +146,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     req.requestId = req.id;
   });
   app.setErrorHandler((error, req, reply) => {
+    if (process.env.WYN_DEBUG_ERRORS) console.error(error);
     if ((error as { validation?: unknown }).validation)
       return fail(
         reply,
@@ -174,7 +180,12 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     }),
   );
   const limited = {
-    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    config: {
+      rateLimit: {
+        max: options.authRateLimitMax ?? 10,
+        timeWindow: '1 minute',
+      },
+    },
   };
   const social = new SocialService(pool);
   const socialLimited = {
@@ -867,6 +878,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           row.is_following;
       return reply.send({
         data: {
+          user_id: row.user_id,
           username: row.username,
           display_name: row.display_name,
           avatar_url: row.avatar_url,
@@ -925,9 +937,9 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     reply.setCookie(ADMIN_COOKIE, token.raw, {
       path: '/',
       httpOnly: true,
-      secure:
-        process.env.NODE_ENV !== 'test' &&
-        process.env.NODE_ENV !== 'development',
+      // __Host- prefixed cookies are rejected by browsers unless Secure is
+      // set, even on http://localhost, which Chrome/Firefox treat as secure.
+      secure: true,
       sameSite: 'lax',
       maxAge: 28800,
     });
@@ -2320,6 +2332,20 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         data: await clubs.get(
           (req.params as { slug: string }).slug,
           req.auth?.userId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/clubs/:slug/members', clubRead, async (req, reply) => {
+    try {
+      return reply.send({
+        data: await clubs.members(
+          (req.params as { slug: string }).slug,
+          req.auth?.userId,
+          (req.query as { cursor?: string }).cursor,
         ),
         request_id: req.requestId,
       });

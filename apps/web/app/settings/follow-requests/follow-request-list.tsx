@@ -14,10 +14,10 @@ export function FollowRequestList() {
   const [error, setError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/me/follow-requests`,
-      { credentials: 'include', signal: controller.signal },
-    )
+    void fetch('/v1/me/follow-requests', {
+      credentials: 'include',
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error('load failed');
         setItems(
@@ -40,14 +40,11 @@ export function FollowRequestList() {
       .find((cookie) => cookie.startsWith('__Host-wyn_csrf='))
       ?.split('=')[1];
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/follow-requests/${id}/${decision}`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'x-csrf-token': token ? decodeURIComponent(token) : '' },
-        },
-      );
+      const response = await fetch(`/v1/follow-requests/${id}/${decision}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'x-csrf-token': token ? decodeURIComponent(token) : '' },
+      });
       if (!response.ok) throw new Error('decision failed');
     } catch {
       setItems(previous);

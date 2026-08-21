@@ -9,6 +9,9 @@ const config = z
     DATABASE_URL: z.string().min(1),
     API_HOST: z.string().default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+    APP_ORIGIN: z.string().default('http://localhost:3000'),
+    ADMIN_ORIGIN: z.string().default('http://localhost:3001'),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   })
   .parse(process.env);
 const database = createDatabase({
@@ -19,7 +22,17 @@ const email =
   config.WYN_ENV === 'production'
     ? new ProductionEmailAdapter()
     : new DevelopmentEmailAdapter();
-const app = await buildApp({ pool: database.pool, email });
+const app = await buildApp({
+  pool: database.pool,
+  email,
+  allowedOrigins: [config.APP_ORIGIN, config.ADMIN_ORIGIN],
+  // Only honored outside production, so a stray env var can never weaken
+  // the real auth rate limit; non-production runners (CI/E2E) that do many
+  // scripted logins in a short window can raise it explicitly.
+  ...(config.WYN_ENV !== 'production' && config.AUTH_RATE_LIMIT_MAX
+    ? { authRateLimitMax: config.AUTH_RATE_LIMIT_MAX }
+    : {}),
+});
 let stopping = false;
 async function shutdown(signal: string) {
   if (stopping) return;

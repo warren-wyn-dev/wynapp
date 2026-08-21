@@ -11,19 +11,16 @@ export default function Register() {
           e.preventDefault();
           setS('loading');
           const f = Object.fromEntries(new FormData(e.currentTarget));
-          const r = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/auth/register`,
-            {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                email: f.email,
-                password: f.password,
-                username: f.username,
-                displayName: f.displayName,
-              }),
-            },
-          );
+          const r = await fetch('/v1/auth/register', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              email: f.email,
+              password: f.password,
+              username: f.username,
+              displayName: f.displayName,
+            }),
+          });
           setS(r.ok ? 'success' : 'error');
         }}
       >

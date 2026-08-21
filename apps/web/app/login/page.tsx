@@ -11,18 +11,15 @@ export default function Login() {
           e.preventDefault();
           setState('loading');
           const f = new FormData(e.currentTarget);
-          const r = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/auth/login`,
-            {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                email: f.get('email'),
-                password: f.get('password'),
-              }),
-            },
-          );
+          const r = await fetch('/v1/auth/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              email: f.get('email'),
+              password: f.get('password'),
+            }),
+          });
           setState(r.ok ? 'success' : 'error');
         }}
       >

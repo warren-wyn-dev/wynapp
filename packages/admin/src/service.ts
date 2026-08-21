@@ -214,8 +214,12 @@ export class AdminService {
       };
       const table = map[type];
       if (!table) throw new AdminError('INVALID_TARGET');
+      // drops.status must stay in lockstep with deleted_at (drops_check1);
+      // comments/clubs/messages only have a plain nullable deleted_at.
       await c.query(
-        `UPDATE ${table} SET deleted_at=COALESCE(deleted_at,now()) WHERE id=$1`,
+        type === 'DROP'
+          ? "UPDATE drops SET status='DELETED',deleted_at=COALESCE(deleted_at,now()) WHERE id=$1"
+          : `UPDATE ${table} SET deleted_at=COALESCE(deleted_at,now()) WHERE id=$1`,
         [id],
       );
     }

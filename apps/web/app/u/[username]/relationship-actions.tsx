@@ -30,7 +30,7 @@ export function RelationshipActions({
   const [error, setError] = useState('');
 
   async function mutate(path: string, method: 'POST' | 'DELETE') {
-    return fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ''}${path}`, {
+    return fetch(path, {
       method,
       credentials: 'include',
       headers: { 'x-csrf-token': csrfToken() },

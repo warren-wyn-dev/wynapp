@@ -41,7 +41,7 @@ export default function ChatInbox() {
       credentials: 'include',
       headers: {
         'x-csrf-token':
-          document.cookie.match(/(?:^|; )wyn_csrf=([^;]+)/)?.[1] ?? '',
+          document.cookie.match(/(?:^|; )__Host-wyn_csrf=([^;]+)/)?.[1] ?? '',
       },
     });
     await load();

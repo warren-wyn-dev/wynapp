@@ -60,7 +60,7 @@ export class DropService {
       }
       const q = await c.query(
         `INSERT INTO drops(author_user_id,status,visibility,body,caption,external_url,location_label,poll_question,poll_expires_at,published_at)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,CASE WHEN $2='PUBLISHED' THEN now() END) RETURNING id`,
+    VALUES($1,$2::drop_status,$3,$4,$5,$6,$7,$8,$9,CASE WHEN $2::drop_status='PUBLISHED' THEN now() END) RETURNING id`,
         [
           userId,
           status,
@@ -101,7 +101,7 @@ export class DropService {
     await c.query(
       `INSERT INTO outbox_events(event_type,aggregate_type,aggregate_id,payload,request_id)
       SELECT 'UserMentioned','Drop',$1,jsonb_build_object('actor_user_id',$2::text,'mention_target_user_id',mentioned_user_id::text),$3
-      FROM drop_mentions WHERE drop_id=$1 AND mentioned_user_id<>$2`,
+      FROM drop_mentions WHERE drop_id=$1 AND mentioned_user_id<>$2::uuid`,
       [id, actor, requestId],
     );
   }
