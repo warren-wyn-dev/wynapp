@@ -7,6 +7,11 @@ export function assertTestDatabase(url: string): void {
 }
 export async function migrate(url: string): Promise<void> {
   const client = new pg.Client({ connectionString: url }); await client.connect();
-  try { const path = fileURLToPath(new URL('../migrations/0001_step6_identity.sql', import.meta.url)); await client.query(await readFile(path, 'utf8')); }
+  try {
+    for (const name of ['0001_step6_identity.sql', '0002_step7_social_graph.sql']) {
+      const path = fileURLToPath(new URL(`../migrations/${name}`, import.meta.url));
+      await client.query(await readFile(path, 'utf8'));
+    }
+  }
   finally { await client.end(); }
 }
