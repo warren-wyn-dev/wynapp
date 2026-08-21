@@ -26,7 +26,7 @@ export function DropComposer({ initialDraftId }: { initialDraftId?: string }) {
     decodeURIComponent(
       document.cookie
         .split('; ')
-        .find((v) => v.startsWith('wyn_csrf='))
+        .find((v) => v.startsWith('__Host-wyn_csrf='))
         ?.split('=')[1] ?? '',
     );
   function choose(files: FileList | null) {
@@ -57,14 +57,11 @@ export function DropComposer({ initialDraftId }: { initialDraftId?: string }) {
     });
   }
   async function upload(item: ImageItem) {
-    const headers = {
-      'content-type': 'application/json',
-      'x-csrf-token': csrf(),
-    };
+    const csrfHeader = { 'x-csrf-token': csrf() };
     const intent = await fetch('/v1/media/upload-intents', {
       method: 'POST',
       credentials: 'include',
-      headers,
+      headers: { 'content-type': 'application/json', ...csrfHeader },
       body: JSON.stringify({
         purpose: 'DROP_IMAGE',
         mime: item.file.type,
@@ -91,7 +88,7 @@ export function DropComposer({ initialDraftId }: { initialDraftId?: string }) {
     await fetch(`/v1/media/${data.id}/complete`, {
       method: 'POST',
       credentials: 'include',
-      headers,
+      headers: csrfHeader,
     });
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1000));

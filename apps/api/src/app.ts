@@ -141,6 +141,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     req.requestId = req.id;
   });
   app.setErrorHandler((error, req, reply) => {
+    if (process.env.WYN_DEBUG_ERRORS) console.error(error);
     if ((error as { validation?: unknown }).validation)
       return fail(
         reply,
@@ -925,9 +926,9 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     reply.setCookie(ADMIN_COOKIE, token.raw, {
       path: '/',
       httpOnly: true,
-      secure:
-        process.env.NODE_ENV !== 'test' &&
-        process.env.NODE_ENV !== 'development',
+      // __Host- prefixed cookies are rejected by browsers unless Secure is
+      // set, even on http://localhost, which Chrome/Firefox treat as secure.
+      secure: true,
       sameSite: 'lax',
       maxAge: 28800,
     });

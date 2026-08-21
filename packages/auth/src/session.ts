@@ -22,8 +22,9 @@ export function setConsumerCookies(
 ): void {
   const common = {
     path: '/',
-    secure:
-      process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test',
+    // __Host- prefixed cookies are rejected by browsers unless Secure is set,
+    // even on http://localhost, which Chrome/Firefox treat as a secure origin.
+    secure: true,
     sameSite: 'lax' as const,
     maxAge: SESSION_MAX_AGE_SECONDS,
   };

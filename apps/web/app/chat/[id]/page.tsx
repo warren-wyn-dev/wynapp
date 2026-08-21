@@ -37,7 +37,8 @@ export default function Conversation({
             headers: {
               'content-type': 'application/json',
               'x-csrf-token':
-                document.cookie.match(/(?:^|; )wyn_csrf=([^;]+)/)?.[1] ?? '',
+                document.cookie.match(/(?:^|; )__Host-wyn_csrf=([^;]+)/)?.[1] ??
+                '',
             },
             body: JSON.stringify({ sequence: x.at(-1)!.sequence }),
           });
@@ -58,7 +59,7 @@ export default function Conversation({
       headers: {
         'content-type': 'application/json',
         'x-csrf-token':
-          document.cookie.match(/(?:^|; )wyn_csrf=([^;]+)/)?.[1] ?? '',
+          document.cookie.match(/(?:^|; )__Host-wyn_csrf=([^;]+)/)?.[1] ?? '',
       },
       body: JSON.stringify({
         kind: 'TEXT',

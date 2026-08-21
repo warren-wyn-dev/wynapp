@@ -41,16 +41,13 @@ export function MediaPicker({
       const csrf =
         document.cookie
           .split('; ')
-          .find((v) => v.startsWith('wyn_csrf='))
+          .find((v) => v.startsWith('__Host-wyn_csrf='))
           ?.split('=')[1] ?? '';
-      const headers = {
-        'content-type': 'application/json',
-        'x-csrf-token': decodeURIComponent(csrf),
-      };
+      const csrfHeader = { 'x-csrf-token': decodeURIComponent(csrf) };
       const intent = await fetch('/v1/media/upload-intents', {
         method: 'POST',
         credentials: 'include',
-        headers,
+        headers: { 'content-type': 'application/json', ...csrfHeader },
         body: JSON.stringify({ purpose, mime: file.type, bytes: file.size }),
       });
       if (!intent.ok) throw new Error();
@@ -70,7 +67,7 @@ export function MediaPicker({
       const done = await fetch(`/v1/media/${body.data.id}/complete`, {
         method: 'POST',
         credentials: 'include',
-        headers,
+        headers: csrfHeader,
       });
       if (!done.ok) throw new Error();
       for (let attempt = 0; attempt < 30; attempt++) {
@@ -87,7 +84,7 @@ export function MediaPicker({
           const attached = await fetch(`/v1/me/${kind}`, {
             method: 'PUT',
             credentials: 'include',
-            headers,
+            headers: { 'content-type': 'application/json', ...csrfHeader },
             body: JSON.stringify({ mediaId: body.data.id }),
           });
           if (!attached.ok) throw new Error();

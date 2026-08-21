@@ -37,7 +37,7 @@ export default function Settings() {
       headers: {
         'content-type': 'application/json',
         'x-csrf-token':
-          document.cookie.match(/(?:^|; )wyn_csrf=([^;]+)/)?.[1] ?? '',
+          document.cookie.match(/(?:^|; )__Host-wyn_csrf=([^;]+)/)?.[1] ?? '',
       },
       body: JSON.stringify({ preferences: [next] }),
     });

@@ -25,13 +25,10 @@ export function RelationshipList({
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(
-      `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}${endpoint}`,
-      {
-        credentials: 'include',
-        signal: controller.signal,
-      },
-    )
+    void fetch(endpoint, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error('load failed');
         const body = (await response.json()) as { data: { items: Person[] } };
@@ -58,7 +55,7 @@ export function RelationshipList({
       ?.split('=')[1];
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/users/${encodeURIComponent(person.username)}/${action.slice(2)}`,
+        `/v1/users/${encodeURIComponent(person.username)}/${action.slice(2)}`,
         {
           method: 'DELETE',
           credentials: 'include',

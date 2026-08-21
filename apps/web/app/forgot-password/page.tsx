@@ -13,14 +13,11 @@ export default function Forgot() {
           onSubmit={async (e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
-            await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/v1/auth/forgot-password`,
-              {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ email: f.get('email') }),
-              },
-            );
+            await fetch('/v1/auth/forgot-password', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ email: f.get('email') }),
+            });
             setS(true);
           }}
         >

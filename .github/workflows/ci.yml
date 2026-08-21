@@ -9,6 +9,26 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wyn_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The trending/discovery integration fixtures disable triggers
+      # (SET session_replication_role='replica') to seed trusted projection
+      # inputs, which Postgres restricts to a superuser. The default
+      # postgres:16 service account is already a superuser, so no extra role
+      # setup is needed here.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wyn_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,7 +41,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      # Several packages (e.g. @wyn/observability, @wyn/validation) are only
+      # published from dist/, and the Consumer/Admin apps' `start` script
+      # requires a prior `next build` — both the integration suite and the
+      # E2E webServer processes need this build to already exist.
+      - run: pnpm build
       - run: pnpm test:unit
       - run: pnpm test:integration
-      - run: pnpm build
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm test:e2e
       - run: pnpm audit --audit-level high
