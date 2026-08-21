@@ -90,9 +90,14 @@ a one-shot script.
 
 ### `apps/admin`
 
-Nothing to configure yet — every route is currently a placeholder with no
-data fetching (see Section 3). It will need the same `API_ORIGIN` +
-rewrites treatment as `apps/web` once real pages are built.
+| Variable     | Required | Notes                                                                                                                                       |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_ORIGIN` | **yes**  | Same rationale as `apps/web`'s `API_ORIGIN` — `next.config.ts` proxies `/admin/v1/*` same-origin so the `__Host-` admin session cookie works. |
+| `PORT`       | no       | The `start` script hardcodes `-p 3001`; override the script (not this var) to change it.                                                      |
+
+Covers login, the report queue, case triage, and moderation actions
+(including step-up). Users/Content/Clubs/Analytics/Settings are still
+placeholders — see Section 3.
 
 ## 3. Known gaps — launch-blocking even with every variable above set
 
@@ -107,12 +112,16 @@ actual implementation or a product decision, not just an env var.
   will fail (register already commits the new user to the database before
   this call, so the user ends up created but the request still errors).
   Needs a real Resend/SES/Postmark integration before launch.
-- **The Admin app has no UI.** Every route under `apps/admin/app` renders
-  a static placeholder ("This route is a foundation placeholder. No
-  product functionality is implemented.") — there is no login form, no
-  report queue, no moderation screen. The Admin API endpoints this would
-  drive are implemented and covered by `tests/e2e/admin-api.spec.ts`, but
-  reachable only by direct API calls today, not through any browser UI.
+- **The Admin app only covers moderation.** Login, the report queue, case
+  triage, and moderation actions (with step-up re-auth) are implemented
+  and covered by a real browser E2E test
+  (`tests/e2e/admin-ui.spec.ts`), not just the API-level
+  `tests/e2e/admin-api.spec.ts`. Users/Content/Clubs/Analytics/Settings
+  are still static placeholders — there is no backend API for them yet,
+  so there was nothing to build a UI against. There is also no admin
+  logout endpoint (`/admin/v1/auth/*` has no `logout` route); the 8-hour
+  session simply expires. Neither blocks the moderation workflow itself,
+  but both are gaps to flag before calling Admin "done."
 - **`SESSION_SECRET` and the `FEATURE_*_ENABLED` flags in
   `scripts/verify-production-env.mjs`'s required list are not read by any
   application code.** Sessions are opaque random tokens stored
