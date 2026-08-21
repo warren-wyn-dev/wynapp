@@ -13,6 +13,7 @@ const valid = {
   OBJECT_STORAGE_REGION: 'us-east-1',
   OBJECT_STORAGE_CDN_ORIGIN: 'https://cdn.staging.wyn.example',
   EMAIL_FROM: 'no-reply@wyn.example',
+  RESEND_API_KEY: 're_configured',
   OBSERVABILITY_DSN: 'configured',
 };
 

@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { createDatabase } from '../../../packages/database/src/index.js';
 import { createS3MediaStorageFromEnv } from '../../../packages/media/src/storage.js';
 import { buildApp } from './app.js';
-import { DevelopmentEmailAdapter, ProductionEmailAdapter } from './email.js';
+import type { EmailAdapter } from './email.js';
+import { DevelopmentEmailAdapter, ResendEmailAdapter } from './email.js';
 
 const config = z
   .object({
@@ -13,16 +14,28 @@ const config = z
     APP_ORIGIN: z.string().default('http://localhost:3000'),
     ADMIN_ORIGIN: z.string().default('http://localhost:3001'),
     AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    EMAIL_FROM: z.string().min(1).optional(),
   })
   .parse(process.env);
 const database = createDatabase({
   databaseUrl: config.DATABASE_URL,
   environment: config.WYN_ENV,
 });
-const email =
-  config.WYN_ENV === 'production'
-    ? new ProductionEmailAdapter()
-    : new DevelopmentEmailAdapter();
+const email: EmailAdapter = (() => {
+  if (config.WYN_ENV !== 'production') return new DevelopmentEmailAdapter();
+  // Fail at startup, not on the first user's registration request, if
+  // production is misconfigured.
+  if (!config.RESEND_API_KEY || !config.EMAIL_FROM)
+    throw new Error(
+      'RESEND_API_KEY and EMAIL_FROM are required when WYN_ENV=production',
+    );
+  return new ResendEmailAdapter(
+    config.RESEND_API_KEY,
+    config.EMAIL_FROM,
+    config.APP_ORIGIN,
+  );
+})();
 const storage = createS3MediaStorageFromEnv(process.env);
 const app = await buildApp({
   pool: database.pool,
