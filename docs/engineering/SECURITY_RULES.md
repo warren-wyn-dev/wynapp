@@ -61,3 +61,7 @@ Every finding records affected scope, prerequisites, reproduction, evidence, imp
 - Maintain monitoring, alerting, backups, tested restoration, and rollback appropriate to system risk.
 - Define incident ownership, containment, evidence preservation, communication, recovery, and post-incident review.
 - Never perform destructive production action without Founder approval, and never expose secrets while troubleshooting.
+
+## Step 8 media boundary
+
+Uploaded images remain private quarantine data until strict decode, bounded dimensions/pixels, metadata stripping and deterministic re-encoding complete. Storage keys and signed requests are server-generated; provider credentials never enter browser code. Media reads, completion, deletion and attachment are owner-authorized and no global media enumeration endpoint is permitted. See `docs/features/media/SECURITY.md`.

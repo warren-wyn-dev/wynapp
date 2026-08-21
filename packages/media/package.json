@@ -1,0 +1,28 @@
+{
+  "name": "@wyn/media",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.864.0",
+    "@aws-sdk/s3-request-presigner": "3.864.0",
+    "pg": "8.23.0",
+    "sharp": "0.35.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}
