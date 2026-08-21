@@ -878,6 +878,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
           row.is_following;
       return reply.send({
         data: {
+          user_id: row.user_id,
           username: row.username,
           display_name: row.display_name,
           avatar_url: row.avatar_url,
@@ -2331,6 +2332,20 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         data: await clubs.get(
           (req.params as { slug: string }).slug,
           req.auth?.userId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return clubFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/clubs/:slug/members', clubRead, async (req, reply) => {
+    try {
+      return reply.send({
+        data: await clubs.members(
+          (req.params as { slug: string }).slug,
+          req.auth?.userId,
+          (req.query as { cursor?: string }).cursor,
         ),
         request_id: req.requestId,
       });

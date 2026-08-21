@@ -144,6 +144,40 @@ export class ClubService {
       };
     });
   }
+  async members(slug: string, viewer: string | undefined, cursor?: string) {
+    return tx(this.pool, async (c) => {
+      const club = await this.club(c, slug);
+      const viewerRole = viewer
+        ? await this.role(c, club.id, viewer)
+        : undefined;
+      if (club.visibility === 'PRIVATE' && !viewerRole)
+        throw new ClubError('FORBIDDEN');
+      let decoded: { joinedAt: string; id: string } | null = null;
+      try {
+        if (cursor)
+          decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+      } catch {
+        decoded = null;
+      }
+      const q = await c.query(
+        `SELECT cm.user_id,p.username_normalized username,p.display_name,p.avatar_url,cm.role,cm.joined_at FROM club_members cm JOIN profiles p ON p.user_id=cm.user_id WHERE cm.club_id=$1 AND ($2::timestamptz IS NULL OR (cm.joined_at,cm.user_id)<($2,$3::uuid)) ORDER BY cm.joined_at DESC,cm.user_id DESC LIMIT 51`,
+        [club.id, decoded?.joinedAt ?? null, decoded?.id ?? null],
+      );
+      const items = q.rows.slice(0, 50);
+      const last = items[items.length - 1] as
+        | { joined_at: string; user_id: string }
+        | undefined;
+      return {
+        items,
+        next_cursor:
+          q.rows.length > 50 && last
+            ? Buffer.from(
+                JSON.stringify({ joinedAt: last.joined_at, id: last.user_id }),
+              ).toString('base64url')
+            : null,
+      };
+    });
+  }
   async join(slug: string, actor: string, requestId: string) {
     return tx(this.pool, async (c) => {
       const club = await this.club(c, slug, true);
