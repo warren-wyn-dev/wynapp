@@ -1,0 +1,21 @@
+{
+  "name": "@wyn/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @wyn/observability build && tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "@wyn/observability": "workspace:*",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "4.19.2"
+  }
+}

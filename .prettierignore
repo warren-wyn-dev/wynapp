@@ -1,0 +1,10 @@
+pnpm-lock.yaml
+.next
+dist
+coverage
+docs/architecture/
+docs/engineering/
+docs/product/
+docs/tech/
+AGENTS.md
+README.md
