@@ -124,6 +124,9 @@ importers:
       '@wyn/drop':
         specifier: workspace:*
         version: link:../../packages/drop
+      '@wyn/engagement':
+        specifier: workspace:*
+        version: link:../../packages/engagement
       '@wyn/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -241,6 +244,19 @@ importers:
         version: 0.31.8
 
   packages/drop:
+    dependencies:
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+
+  packages/engagement:
     dependencies:
       pg:
         specifier: 8.23.0

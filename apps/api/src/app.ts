@@ -49,6 +49,10 @@ import {
 } from '../../../packages/media/src/service.js';
 import type { MediaStorage } from '../../../packages/media/src/storage.js';
 import { DropError, DropService } from '../../../packages/drop/src/index.js';
+import {
+  EngagementError,
+  EngagementService,
+} from '../../../packages/engagement/src/index.js';
 
 type Deps = {
   pool?: Pool;
@@ -172,6 +176,10 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
   };
   const drops = new DropService(pool);
+  const engagement = new EngagementService(pool);
+  const engageLimited = {
+    config: { rateLimit: { max: 40, timeWindow: '1 minute' } },
+  };
   const dropLimited = {
     config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
   };
@@ -211,6 +219,35 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
     throw error;
   }
   const uuid = z.uuid();
+  function engagementFailure(
+    error: unknown,
+    reply: FastifyReply,
+    requestId: string,
+  ) {
+    if (error instanceof z.ZodError)
+      return fail(
+        reply,
+        400,
+        'VALIDATION_ERROR',
+        'The engagement request is invalid.',
+        requestId,
+      );
+    if (error instanceof EngagementError)
+      return fail(
+        reply,
+        error.code === 'FORBIDDEN'
+          ? 403
+          : error.code === 'INVALID_CURSOR'
+            ? 400
+            : error.code === 'INVALID_PARENT'
+              ? 409
+              : 404,
+        error.code,
+        'The engagement operation is unavailable.',
+        requestId,
+      );
+    throw error;
+  }
   async function targetId(username: string): Promise<string | null> {
     const q = await pool.query(
       "SELECT p.user_id FROM profiles p JOIN users u ON u.id=p.user_id WHERE p.username_normalized=$1 AND u.account_state IN ('ACTIVE','RESTRICTED')",
@@ -1403,5 +1440,225 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       }
     },
   );
+  const engagementMutation = { ...engageLimited, preHandler: [consumer, csrf] };
+  app.post('/v1/drops/:id/like', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await engagement.like(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete('/v1/drops/:id/like', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await engagement.unlike(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/drops/:id/comments', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.code(201).send({
+        data: await engagement.comment(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.body,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.get(
+    '/v1/drops/:id/comments',
+    { preHandler: [consumer] },
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.send({
+          data: await engagement.comments(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth.userId,
+            (req.query as { cursor?: string }).cursor,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (e) {
+        return engagementFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.post(
+    '/v1/comments/:id/replies',
+    engagementMutation,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        const id = uuid.parse((req.params as { id: string }).id);
+        const q = await pool.query('SELECT drop_id FROM comments WHERE id=$1', [
+          id,
+        ]);
+        if (!q.rowCount) throw new EngagementError('NOT_FOUND');
+        return reply.code(201).send({
+          data: await engagement.comment(
+            q.rows[0].drop_id,
+            req.auth.userId,
+            req.body,
+            req.requestId,
+            id,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (e) {
+        return engagementFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.delete('/v1/comments/:id', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await engagement.removeComment(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth.userId,
+        req.requestId,
+      );
+      return reply.code(204).send();
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/drops/:id/redrop', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await engagement.redrop(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete('/v1/drops/:id/redrop', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await engagement.unredrop(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth.userId,
+        req.requestId,
+      );
+      return reply.code(204).send();
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.post(
+    '/v1/drops/:id/quote-redrop',
+    engagementMutation,
+    async (req, reply) => {
+      if (!req.auth) return;
+      try {
+        return reply.code(201).send({
+          data: await engagement.quote(
+            uuid.parse((req.params as { id: string }).id),
+            req.auth.userId,
+            req.body,
+            req.requestId,
+          ),
+          request_id: req.requestId,
+        });
+      } catch (e) {
+        return engagementFailure(e, reply, req.requestId);
+      }
+    },
+  );
+  app.post('/v1/drops/:id/save', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await engagement.save(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth.userId,
+        req.requestId,
+      );
+      return reply.code(204).send();
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.delete('/v1/drops/:id/save', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await engagement.save(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth.userId,
+        req.requestId,
+        true,
+      );
+      return reply.code(204).send();
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.get('/v1/me/saved', { preHandler: [consumer] }, async (req, reply) => {
+    if (!req.auth) return;
+    return reply.send({
+      data: await engagement.saved(
+        req.auth.userId,
+        (req.query as { cursor?: string }).cursor,
+      ),
+      request_id: req.requestId,
+    });
+  });
+  app.post('/v1/drops/:id/view', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      return reply.send({
+        data: await engagement.view(
+          uuid.parse((req.params as { id: string }).id),
+          req.auth.userId,
+          req.requestId,
+        ),
+        request_id: req.requestId,
+      });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
+  app.post('/v1/drops/:id/share', engagementMutation, async (req, reply) => {
+    if (!req.auth) return;
+    try {
+      await engagement.share(
+        uuid.parse((req.params as { id: string }).id),
+        req.auth.userId,
+        req.body,
+      );
+      return reply
+        .code(202)
+        .send({ data: { accepted: true }, request_id: req.requestId });
+    } catch (e) {
+      return engagementFailure(e, reply, req.requestId);
+    }
+  });
   return app;
 }

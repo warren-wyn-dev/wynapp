@@ -69,3 +69,7 @@ Uploaded images remain private quarantine data until strict decode, bounded dime
 ## Step 9 Drop boundary
 
 Drop author IDs are session-derived. Drafts and revisions are never public; published reads recheck blocks, follows, account privacy, state, and soft deletion. Attachments are transactionally restricted to nine READY, author-owned DROP_IMAGE assets. External links permit only HTTP(S), and user text is plain text rather than HTML.
+
+## Step 10 engagement
+
+Engagement commands re-authorize Drop visibility, bidirectional block, follow/private state, account state and deletion on every direct mutation and saved/comment read. Client-supplied actor IDs and counts are ignored; Save membership is never public, and ReDrop/Quote rendering must not cache or leak an inaccessible original.

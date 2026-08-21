@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { EngagementPanel } from '../../components/engagement-panel';
 type Drop = {
   body: string;
   caption: string;
@@ -14,6 +15,13 @@ type Drop = {
   media: { id: string; position: number }[];
   poll_question?: string;
   poll_options: { id: string; label: string }[];
+  id: string;
+  likes_count: number;
+  comments_count: number;
+  redrops_count: number;
+  views_count: number;
+  liked: boolean;
+  saved: boolean;
 };
 export default function DropDetail({
   params,
@@ -96,8 +104,8 @@ export default function DropDetail({
       <footer>
         <time>{new Date(drop.created_at).toLocaleString('th-TH')}</time>
         {drop.edited_at && <span> · แก้ไขแล้ว</span>}
-        <p className="muted">Like, Comment และ ReDrop จะมาใน Step 10</p>
       </footer>
+      <EngagementPanel dropId={drop.id} initial={drop} />
     </article>
   );
 }

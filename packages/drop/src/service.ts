@@ -254,8 +254,14 @@ export class DropService {
    COALESCE((SELECT jsonb_agg(h.normalized ORDER BY h.normalized) FROM drop_hashtags dh JOIN hashtags h ON h.id=dh.hashtag_id WHERE dh.drop_id=d.id),'[]'::jsonb) hashtags,
    COALESCE((SELECT jsonb_agg(jsonb_build_object('userId',p2.user_id,'username',p2.username_normalized)) FROM drop_mentions dm JOIN profiles p2 ON p2.user_id=dm.mentioned_user_id WHERE dm.drop_id=d.id),'[]'::jsonb) mentions,
    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',o.id,'label',o.label,'position',o.position) ORDER BY o.position) FROM drop_poll_options o WHERE o.drop_id=d.id),'[]'::jsonb) poll_options
+   ,(SELECT count(*)::int FROM drop_likes l WHERE l.drop_id=d.id) likes_count
+   ,(SELECT count(*)::int FROM comments c2 WHERE c2.drop_id=d.id AND c2.deleted_at IS NULL) comments_count
+   ,(SELECT count(*)::int FROM redrops r WHERE r.original_drop_id=d.id AND r.deleted_at IS NULL) redrops_count
+   ,(SELECT count(*)::int FROM drop_views v WHERE v.drop_id=d.id) views_count
+   ,EXISTS(SELECT 1 FROM drop_likes l WHERE l.drop_id=d.id AND l.user_id=$2) liked
+   ,EXISTS(SELECT 1 FROM saved_drops s WHERE s.drop_id=d.id AND s.user_id=$2) saved
    FROM drops d JOIN profiles p ON p.user_id=d.author_user_id WHERE d.id=$1`,
-      [id],
+      [id, viewerId ?? null],
     );
     const row = q.rows[0];
     if (!row) throw new DropError('NOT_FOUND');
