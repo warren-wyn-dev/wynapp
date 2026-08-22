@@ -1,0 +1,24 @@
+services:
+  app:
+    image: node:20-bookworm
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://wyn:wyn@db:5432/wyn_dev
+      DEV_EMAIL_LOG_PATH: /workspace/.devcontainer/dev-emails.jsonl
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wyn
+      POSTGRES_PASSWORD: wyn
+      POSTGRES_DB: wyn_dev
+    volumes:
+      - wyn-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  wyn-postgres-data:
