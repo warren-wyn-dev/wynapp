@@ -18,6 +18,7 @@
     "apps/**/*.tsx",
     "packages/**/*.ts",
     "tests/**/*.ts",
+    "scripts/**/*.ts",
     "eslint.config.mjs",
     "vitest*.ts"
   ]
