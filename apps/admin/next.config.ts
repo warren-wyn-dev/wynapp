@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
 const apiOrigin = process.env.API_ORIGIN ?? 'http://localhost:4000';
 const config: NextConfig = {
   reactStrictMode: true,
@@ -29,4 +30,14 @@ const config: NextConfig = {
     ];
   },
 };
-export default config;
+export default withSentryConfig(config, {
+  silent: true,
+  // No org/project/authToken configured for this environment — skip
+  // source-map upload entirely rather than let the build warn or stall
+  // trying to reach Sentry's API.
+  sourcemaps: { disable: true },
+  webpack: {
+    automaticVercelMonitors: false,
+    treeshake: { removeDebugLogging: true },
+  },
+});
