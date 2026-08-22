@@ -13,7 +13,10 @@ below.
 
 This document does not authorize a deployment. Production deployment,
 cloud-provider selection, and infrastructure cost commitments all require
-explicit Founder approval per `AGENTS.md`.
+explicit Founder approval per `AGENTS.md`. For the actual order of
+operations to stand up and validate a staging environment using the
+variables below, see
+[`WYN_V1_STAGING_DEPLOYMENT_RUNBOOK.md`](./WYN_V1_STAGING_DEPLOYMENT_RUNBOOK.md).
 
 ## How to use this
 
