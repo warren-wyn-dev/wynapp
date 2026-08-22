@@ -41,6 +41,11 @@ export default defineConfig({
       url: `${API_ORIGIN}/health`,
       reuseExistingServer: reuse,
       timeout: 30000,
+      // Playwright ignores webServer output by default, which is why a
+      // startup crash in CI previously produced only "Exit code: N" with no
+      // detail — pipe both streams so an actual crash shows its real error.
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: {
         WYN_ENV: 'test',
         NODE_ENV: 'test',
@@ -61,6 +66,8 @@ export default defineConfig({
       url: `${WEB_ORIGIN}/login`,
       reuseExistingServer: reuse,
       timeout: 60000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(WEB_PORT) },
     },
     {
@@ -68,6 +75,8 @@ export default defineConfig({
       url: `${ADMIN_ORIGIN}/login`,
       reuseExistingServer: reuse,
       timeout: 60000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: { API_ORIGIN, NODE_ENV: 'test', PORT: String(ADMIN_PORT) },
     },
     {
@@ -80,6 +89,8 @@ export default defineConfig({
       url: `http://localhost:${WORKER_HEALTH_PORT}/health`,
       reuseExistingServer: reuse,
       timeout: 30000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: {
         WORKER_ID: 'e2e-worker',
         DATABASE_URL: TEST_DATABASE_URL,
@@ -97,6 +108,8 @@ export default defineConfig({
       url: `${OBJECT_STORAGE_ENV.OBJECT_STORAGE_ENDPOINT}/health`,
       reuseExistingServer: reuse,
       timeout: 15000,
+      stdout: 'pipe',
+      stderr: 'pipe',
       env: { MOCK_S3_PORT: String(MOCK_S3_PORT) },
     },
   ],

@@ -159,4 +159,27 @@ test.describe('Admin API', () => {
     const dropAfterRemoval = await request.get(`/v1/drops/${dropId}`);
     expect(dropAfterRemoval.status()).toBe(404);
   });
+
+  test('logout revokes the admin session server-side', async ({ request }) => {
+    const adminLogin = await request.post('/admin/v1/auth/login', {
+      data: { email: SEED_ADMIN_EMAIL, password: SEED_ADMIN_PASSWORD },
+    });
+    expect(adminLogin.ok()).toBeTruthy();
+    const adminCsrf = (await adminLogin.json()).data.csrf_token as string;
+    const adminHeaders = {
+      origin: ADMIN_ORIGIN,
+      'x-admin-csrf-token': adminCsrf,
+    };
+
+    expect((await request.get('/admin/v1/session')).ok()).toBeTruthy();
+
+    const logout = await request.post('/admin/v1/auth/logout', {
+      headers: adminHeaders,
+    });
+    expect(logout.status()).toBe(204);
+
+    // Confirms the session was actually revoked server-side (the row's
+    // revoked_at set), not just that the client's cookie got cleared.
+    expect((await request.get('/admin/v1/session')).status()).toBe(401);
+  });
 });

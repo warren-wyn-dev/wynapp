@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { createDatabase } from '../../../packages/database/src/index.js';
 import { createS3MediaStorageFromEnv } from '../../../packages/media/src/storage.js';
+import {
+  createSentryErrorCapture,
+  noopErrorCapture,
+} from '../../../packages/observability/src/index.js';
 import { buildApp } from './app.js';
 import type { EmailAdapter } from './email.js';
 import { DevelopmentEmailAdapter, ResendEmailAdapter } from './email.js';
@@ -17,6 +21,7 @@ const config = z
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().min(1).optional(),
     DEV_EMAIL_LOG_PATH: z.string().min(1).optional(),
+    OBSERVABILITY_DSN: z.string().min(1).optional(),
   })
   .parse(process.env);
 const database = createDatabase({
@@ -39,9 +44,15 @@ const email: EmailAdapter = (() => {
   );
 })();
 const storage = createS3MediaStorageFromEnv(process.env);
+// Absence degrades observability, not user-facing behavior (unlike email),
+// so this stays a soft fallback rather than a startup failure.
+const errorCapture = config.OBSERVABILITY_DSN
+  ? createSentryErrorCapture(config.OBSERVABILITY_DSN, config.WYN_ENV)
+  : noopErrorCapture;
 const app = await buildApp({
   pool: database.pool,
   email,
+  errorCapture,
   allowedOrigins: [config.APP_ORIGIN, config.ADMIN_ORIGIN],
   ...(storage ? { storage } : {}),
   // Only honored outside production, so a stray env var can never weaken

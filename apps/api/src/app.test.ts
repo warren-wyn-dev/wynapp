@@ -23,4 +23,40 @@ describe('API probes', () => {
       },
     });
   });
+  it('treats malformed request bodies as 400s, not captured 500s', async () => {
+    const captured: unknown[] = [];
+    app = await buildApp({
+      allowedOrigins: ['http://localhost:3000'],
+      errorCapture: { capture: (error) => captured.push(error) },
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { email: 'not-an-email' },
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      error: { code: 'VALIDATION_ERROR' },
+    });
+    expect(captured).toHaveLength(0);
+  });
+  it('captures genuinely unexpected errors', async () => {
+    const captured: unknown[] = [];
+    app = await buildApp({
+      allowedOrigins: ['http://localhost:3000'],
+      errorCapture: { capture: (error) => captured.push(error) },
+    });
+    // A well-formed request with no pool configured hits buildApp's
+    // Database-is-unavailable stub, a genuine unexpected failure.
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/login',
+      payload: { email: 'user@example.com', password: 'whatever' },
+    });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      error: { code: 'INTERNAL_ERROR' },
+    });
+    expect(captured).toHaveLength(1);
+  });
 });

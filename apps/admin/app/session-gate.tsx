@@ -1,7 +1,7 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { adminFetch, AdminApiError } from './lib/admin-api';
+import { adminFetch, AdminApiError, clearCsrfToken } from './lib/admin-api';
 
 type Status =
   | { kind: 'checking' }
@@ -34,6 +34,15 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router]);
 
+  async function logout() {
+    try {
+      await adminFetch('/admin/v1/auth/logout', { method: 'POST' });
+    } finally {
+      clearCsrfToken();
+      router.replace('/login');
+    }
+  }
+
   if (pathname === '/login') return <>{children}</>;
   if (status.kind === 'checking')
     return (
@@ -45,7 +54,8 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       <p className="session-badge">
-        เข้าสู่ระบบในฐานะ <strong>{status.role}</strong>
+        เข้าสู่ระบบในฐานะ <strong>{status.role}</strong>{' '}
+        <button onClick={() => void logout()}>ออกจากระบบ</button>
       </p>
       {children}
     </>

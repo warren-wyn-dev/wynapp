@@ -35,3 +35,6 @@ export function clearConsumerCookies(reply: CookieReply): void {
   reply.clearCookie(CONSUMER_COOKIE, { path: '/' });
   reply.clearCookie(CSRF_COOKIE, { path: '/' });
 }
+export function clearAdminCookies(reply: CookieReply): void {
+  reply.clearCookie(ADMIN_COOKIE, { path: '/' });
+}

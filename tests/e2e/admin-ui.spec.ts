@@ -79,6 +79,17 @@ test.describe('Admin UI', () => {
 
     const removed = await request.get(`${API_ORIGIN}/v1/drops/${dropId}`);
     expect(removed.status()).toBe(404);
+
+    await page.getByRole('button', { name: 'ออกจากระบบ' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+    // page.request shares the browser's cookie jar (the admin session
+    // cookie was set via the login form, not the standalone `request`
+    // fixture above) -- confirms logout actually revoked it server-side,
+    // not just cleared client state.
+    const sessionAfterLogout = await page.request.get(
+      `${API_ORIGIN}/admin/v1/session`,
+    );
+    expect(sessionAfterLogout.status()).toBe(401);
   });
 
   test('unauthenticated visitors are redirected to login', async ({ page }) => {

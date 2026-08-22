@@ -1,5 +1,6 @@
 import pino, { type Logger } from 'pino';
 import { randomUUID } from 'node:crypto';
+import * as Sentry from '@sentry/node';
 const redact = [
   'password',
   'token',
@@ -30,3 +31,21 @@ export const noopMetrics: Metrics = {
   increment: () => undefined,
   observe: () => undefined,
 };
+
+/**
+ * Initializes the Sentry Node SDK once and returns an ErrorCapture backed by
+ * it. tracesSampleRate is 0 — this wires error reporting only, not
+ * performance tracing, which would need its own review of what's worth the
+ * overhead.
+ */
+export function createSentryErrorCapture(
+  dsn: string,
+  environment: string,
+): ErrorCapture {
+  Sentry.init({ dsn, environment, tracesSampleRate: 0 });
+  return {
+    capture(error, context) {
+      Sentry.captureException(error, context ? { extra: context } : undefined);
+    },
+  };
+}

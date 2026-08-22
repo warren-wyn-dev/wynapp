@@ -31,12 +31,17 @@ import {
 } from '../../../packages/auth/src/schemas.js';
 import {
   ADMIN_COOKIE,
+  clearAdminCookies,
   clearConsumerCookies,
   CONSUMER_COOKIE,
   CSRF_COOKIE,
   setConsumerCookies,
 } from '../../../packages/auth/src/session.js';
 import type { EmailAdapter } from './email.js';
+import {
+  noopErrorCapture,
+  type ErrorCapture,
+} from '../../../packages/observability/src/index.js';
 import {
   SocialError,
   SocialService,
@@ -69,6 +74,7 @@ type Deps = {
   pool?: Pool;
   email?: EmailAdapter;
   storage?: MediaStorage;
+  errorCapture?: ErrorCapture;
   allowedOrigins?: readonly string[];
   ready?: () => Promise<boolean>;
   // Test/staging-only override for the auth-endpoint rate limit (default 10
@@ -131,6 +137,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       },
     });
   const email = options.email ?? { async send() {} };
+  const errorCapture = options.errorCapture ?? noopErrorCapture;
   const app = Fastify({ logger: false, genReqId: () => randomUUID() });
   await app.register(cookie);
   await app.register(cors, {
@@ -147,7 +154,15 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
   });
   app.setErrorHandler((error, req, reply) => {
     if (process.env.WYN_DEBUG_ERRORS) console.error(error);
-    if ((error as { validation?: unknown }).validation)
+    // Every route validates its own body with a Zod schema's .parse() call
+    // (no route uses Fastify's built-in `schema` option, so the `validation`
+    // property Fastify would set never appears here) — routine bad input
+    // (a malformed email, a too-short password) throws a ZodError, not a
+    // real bug, and must not count as one.
+    if (
+      (error as { validation?: unknown }).validation ||
+      error instanceof z.ZodError
+    )
       return fail(
         reply,
         400,
@@ -155,6 +170,7 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
         'The request is invalid.',
         req.requestId,
       );
+    errorCapture.capture(error, { request_id: req.requestId });
     return fail(
       reply,
       500,
@@ -985,6 +1001,19 @@ export async function buildApp(options: Deps): Promise<FastifyInstance> {
       data: { authenticated: true, role: req.admin!.role },
       request_id: req.requestId,
     }),
+  );
+  app.post(
+    '/admin/v1/auth/logout',
+    { preHandler: [admin, adminCsrf] },
+    async (req, reply) => {
+      if (!req.admin) return;
+      await pool.query(
+        "UPDATE sessions SET revoked_at=now(),revocation_reason='LOGOUT' WHERE id=$1",
+        [req.admin.sessionId],
+      );
+      clearAdminCookies(reply);
+      return reply.code(204).send();
+    },
   );
   app.post(
     '/v1/reports',
