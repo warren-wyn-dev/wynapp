@@ -15,33 +15,17 @@ variable's rationale.
 
 ---
 
-## 0. Blocker to resolve before Step 1
+## 0. Migration tooling (resolved)
 
-**There is currently no safe, operator-facing way to apply the 11 SQL
-migrations to a real (non-test) database.** Two things exist, and neither
-covers it:
-
-- `packages/database/src/migrate.ts`'s `migrate(url)` runs the 11 files in
-  `packages/database/migrations/*.sql` in order — but it's only ever
-  called from test/E2E setup code, with no CLI entry point exposed for
-  running it against an arbitrary target. A sibling function,
-  `assertTestDatabase()`, refuses non-test-shaped URLs, but callers have
-  to invoke it themselves — `migrate()` itself has no built-in guard.
-- `drizzle-kit migrate` (the `db:migrate` script in
-  `packages/database/package.json`) is wired to `src/schema.ts`, which is
-  an intentionally empty placeholder (`export {}`) — there is no Drizzle
-  schema for it to diff, and no `migrations/meta/_journal.json`, so it has
-  never actually applied these hand-written SQL files and isn't
-  positioned to.
-
-Before Step 1 can run for real, someone needs to add a small script (e.g.
-`packages/database/scripts/migrate-deploy.mjs` or similar) that calls
-`migrate(process.env.DATABASE_URL)` directly against whatever URL is
-passed in, with its own explicit confirmation step (not
-`assertTestDatabase`, which is designed to refuse exactly this). This is a
-short, well-scoped piece of work — flag it back if you want it built next,
-rather than treating "run migrations 0001–0011" below as something you can
-already do.
+Previously there was no operator-facing way to apply the 11 SQL
+migrations to a real database — `migrate()` (test/E2E setup only) and
+`drizzle-kit migrate` (non-functional; `schema.ts` is an empty
+placeholder) didn't cover it. This is now closed: `deployMigrations()`
+(`packages/database/src/migrate.ts`) tracks what's applied in a
+`schema_migrations` ledger table and only runs what's new, each migration
+in its own transaction — safe to run against a fresh database or redeploy
+against an already-migrated one alike. `scripts/migrate-deploy.ts` is the
+CLI wrapper; see Section 4.
 
 ---
 
@@ -51,7 +35,6 @@ Confirm all of these before starting. Do not provision anything until
 they're true.
 
 - [ ] `main` is green: `pnpm lint && pnpm typecheck && pnpm test && pnpm run test:integration && pnpm build && pnpm audit --audit-level high` all pass locally or in CI on the commit you intend to deploy.
-- [ ] The migration blocker in Section 0 is resolved.
 - [ ] You (Founder) have decided on providers per [`DEPLOYMENT_STACK.md`](../tech/DEPLOYMENT_STACK.md)'s preferred topology, or an explicit deviation from it.
 - [ ] A place to put staging secrets exists that is not this chat, not a committed file, and not `.env.example` — your hosting platform's own secret store.
 - [ ] You've read [`WYN_V1_DEPLOYMENT_CHECKLIST.md`](./WYN_V1_DEPLOYMENT_CHECKLIST.md) Section 3 (known gaps) and are deploying with those accepted, not surprised by them later.
@@ -129,16 +112,18 @@ value; any 32+ character string and `true`/`false` values are fine.
 
 ## 4. Apply migrations
 
-Blocked on Section 0. Once the migration script exists:
-
 ```bash
-DATABASE_URL=<staging DB> node packages/database/scripts/migrate-deploy.mjs
+DATABASE_URL=<staging DB> pnpm db:migrate:deploy -- --yes
 ```
 
-(or whatever the actual script ends up being called). Confirm all 11
-migrations applied by checking a table each one introduces exists — e.g.
-`admin_principals` (0010) and the `CLUB_AVATAR`/`CLUB_COVER` enum values
-on `media_purpose` (0011) are the last two and easiest to spot-check.
+`--yes` is required — without it, the script only prints which host it
+would target and exits nonzero, so you can confirm you're pointed at the
+right database before anything runs. It prints which migrations it
+applied and how many were already applied (0 on a fresh database, 11 on
+a repeat run against an already-migrated one — safe to re-run on every
+redeploy). Confirm afterward by checking a table each of the last two
+migrations introduces exists — e.g. `admin_principals` (0010) and the
+`CLUB_AVATAR`/`CLUB_COVER` enum values on `media_purpose` (0011).
 
 ---
 
