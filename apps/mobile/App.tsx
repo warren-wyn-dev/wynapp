@@ -34,7 +34,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
     error?: { message?: string };
   } | null;
   if (!response.ok) {
-    throw new Error(body?.error?.message ?? `request failed (${response.status})`);
+    throw new Error(
+      body?.error?.message ?? `request failed (${response.status})`,
+    );
   }
   return (body?.data ?? body) as T;
 }
@@ -204,9 +206,7 @@ export default function App() {
       )}
 
       {message.length > 0 && (
-        <Text
-          style={status === 'error' ? styles.errorText : styles.statusText}
-        >
+        <Text style={status === 'error' ? styles.errorText : styles.statusText}>
           {message}
         </Text>
       )}
