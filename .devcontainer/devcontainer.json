@@ -1,0 +1,19 @@
+{
+  "name": "WYN dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "forwardPorts": [3000, 4000],
+  "portsAttributes": {
+    "3000": {
+      "label": "WYN Web",
+      "onAutoForward": "openPreview"
+    },
+    "4000": {
+      "label": "WYN API",
+      "onAutoForward": "silent"
+    }
+  }
+}
